@@ -1,7 +1,13 @@
 /** @type {import('next').NextConfig} */
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://orgyx-backend.onrender.com";
-
+const getApiUrl = () => {
+  let url = process.env.NEXT_PUBLIC_API_URL || "https://orgyx-backend.onrender.com";
+  if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    url = `https://${url}`;
+  }
+  return url.replace(/\/$/, '');
+};
+const API_URL = getApiUrl();
 const nextConfig = {
   reactStrictMode: false,
 
