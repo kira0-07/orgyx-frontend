@@ -75,7 +75,7 @@ export default function MeetingQAPanel({ meetingId, meetingName }) {
             <MessageSquare className="h-10 w-10 text-muted-foreground" />
             <p className="text-muted-foreground text-sm">Ask questions about the meeting</p>
             <p className="text-xs text-muted-foreground">
-              Try: "What were the key decisions?" or "What action items were assigned?"
+              Try: &quot;What were the key decisions?&quot; or &quot;What action items were assigned?&quot;
             </p>
           </div>
         ) : (

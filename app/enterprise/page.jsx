@@ -13,7 +13,7 @@ export default function EnterprisePage() {
           <div className="lg:col-span-7 flex flex-col gap-8 tracking-tight">
             <div className="flex flex-col gap-4">
               <p className="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400 font-bold border border-slate-300 dark:border-slate-800 rounded-full px-5 py-2 w-fit bg-slate-100 dark:bg-slate-900 shadow-sm leading-relaxed max-w-xl">
-                This is an official and registered product of the CATALYST TECHNOLOGIES Pvt. Ltd. that is "THE C. Tech."
+                This is an official and registered product of the CATALYST TECHNOLOGIES Pvt. Ltd. that is &quot;THE C. Tech.&quot;
               </p>
               <h1 className="text-5xl md:text-7xl font-extrabold tracking-tighter text-slate-900 dark:text-white leading-[1.1] md:leading-[1.0] max-w-2xl font-serif mt-2">
                 Orchestrate at Scale.
@@ -118,7 +118,7 @@ export default function EnterprisePage() {
                   </div>
                   <h3 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white pt-2">Reliability SLA</h3>
                   <p className="text-slate-600 dark:text-slate-400 leading-relaxed text-lg">
-                    Our Uptime guarantee isn't just a promise; it's a structural mandate backed by multi-region redundancy and real-time failover logic.
+                    Our Uptime guarantee isn&apos;t just a promise; it&apos;s a structural mandate backed by multi-region redundancy and real-time failover logic.
                   </p>
                 </div>
               </div>
@@ -150,10 +150,10 @@ export default function EnterprisePage() {
 
             <div className="relative z-10 max-w-3xl mx-auto space-y-10">
               <h2 className="text-5xl md:text-6xl font-extrabold tracking-tighter leading-tight font-serif">
-                Draft your Enterprise's Future.
+                Draft your Enterprise&apos;s Future.
               </h2>
               <p className="text-xl text-slate-300 leading-relaxed max-w-2xl mx-auto">
-                Join the world's most resilient organizations who use OrgOS to architect their digital operations with precision, security, and scale.
+                Join the world&apos;s most resilient organizations who use OrgOS to architect their digital operations with precision, security, and scale.
               </p>
               <div className="flex flex-col sm:flex-row justify-center gap-6 pt-4">
                 <Link href="/contact" className="w-full sm:w-auto">
@@ -177,7 +177,7 @@ export default function EnterprisePage() {
           <div className="col-span-2 md:col-span-1 space-y-6">
             <div className="text-xl font-black tracking-tight text-slate-900 dark:text-white">ORG-OS</div>
             <p className="font-sans text-xs tracking-wider text-slate-500 dark:text-slate-400 leading-relaxed uppercase font-semibold">
-              This is an official and registered product of the CATALYST TECHNOLOGIES Pvt. Ltd. that is "THE C. Tech."
+              This is an official and registered product of the CATALYST TECHNOLOGIES Pvt. Ltd. that is &quot;THE C. Tech.&quot;
             </p>
             <p className="font-sans text-xs tracking-wider text-slate-500 dark:text-slate-500 leading-relaxed">
               © 2024 Catalyst Technologies. All rights reserved.

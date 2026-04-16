@@ -11,7 +11,7 @@ export default function ProductPage() {
               The Architecture of Performance
             </h1>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Team Catalyst isn't just software. It is a foundational layer for your entire organization, built on enterprise-grade infrastructure.
+              Team Catalyst isn&apos;t just software. It is a foundational layer for your entire organization, built on enterprise-grade infrastructure.
             </p>
         </div>
 
