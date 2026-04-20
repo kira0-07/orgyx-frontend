@@ -8,7 +8,7 @@ export default function LandingPage() {
     <div className="min-h-screen bg-[#fcfbfa] text-[#1c1c1a] dark:bg-slate-950 dark:text-slate-50 selection:bg-[#c2a278]/20 transition-colors duration-300 flex flex-col font-sans">
       <MarketingNavbar />
       
-      <main className="flex-1 w-full max-w-[1400px] mx-auto px-6 lg:px-12 flex flex-col pt-8 lg:pt-10 relative overflow-hidden">
+      <main className="flex-1 w-full max-w-[1400px] mx-auto px-6 lg:px-12 flex flex-col pt-8 lg:pt-10 relative overflow-x-clip pb-20">
         
         {/* Soft decorative background gradients (very subtle) */}
         <div className="absolute top-0 right-0 -mr-48 -mt-48 w-[600px] h-[600px] bg-[#f0eee6]/80 dark:bg-primary/5 rounded-full blur-[120px] pointer-events-none transition-colors duration-700" />
