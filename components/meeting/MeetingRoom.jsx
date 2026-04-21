@@ -313,23 +313,6 @@ export default function MeetingRoom({ meetingId, user }) {
     myRecorderRef.current = null; myRecordingStartTimeRef.current = null; initSegmentRef.current = null; setIsMyRecording(false);
   }, [meetingId]);
 
-  const flushMyChunks = useCallback(() => {
-    return new Promise((resolve) => {
-      if (!socketRef.current?.connected) { resolve(); return; }
-
-      const timeout = setTimeout(() => {
-        console.warn('flush-my-chunks timed out');
-        resolve();
-      }, 20000);
-
-      socketRef.current.once('my-chunks-flushed', ({ meetingId: mid }) => {
-        if (mid === meetingId) { clearTimeout(timeout); resolve(); }
-      });
-
-      socketRef.current.emit('flush-my-chunks', { meetingId });
-    });
-  }, [meetingId]);
-
   useEffect(() => {
     let mounted = true;
     const init = async () => {
@@ -412,30 +395,7 @@ export default function MeetingRoom({ meetingId, user }) {
         });
 
         socketRef.current.on('recording-stopped', () => { setIsRecording(false); stopMyRecording(); });
-
-        // FIX 1: Non-host meeting-ended handler
-        // - Flush chunks BEFORE calling cleanup() so the socket is still alive
-        // - Guard flushMyChunks with a socket.connected check to avoid hanging
-        //   if the connection already dropped when the host ended the meeting
-        socketRef.current.on('meeting-ended', async () => {
-          if (!mounted) return;
-          toast.success('Meeting ended by host');
-          try {
-            // 1. Flush final in-memory chunk to server queue
-            await stopMyRecording();
-            // 2. Upload our chunks to S3 — only if socket is still connected
-            if (socketRef.current?.connected) {
-              await flushMyChunks();
-            }
-          } catch (e) {
-            console.warn('Non-host chunk flush failed:', e.message);
-          }
-          // 3. cleanup() AFTER flush is done (calling it earlier would
-          //    disconnect the socket and break the flush round-trip)
-          cleanup();
-          router.push(`/meetings/${meetingId}`);
-        });
-
+        socketRef.current.on('meeting-ended', () => { toast.success('Meeting ended by host'); stopMyRecording(); cleanup(); router.push(`/meetings/${meetingId}`); });
         socketRef.current.on('meeting-cancelled', ({ message }) => { setMeetingCancelled(true); toast.error(message || 'Meeting has been cancelled by the host'); stopMyRecording(); cleanup(); setTimeout(() => router.push('/meetings/history'), 2000); });
 
         joinRoom(meetingId, myId);
@@ -547,7 +507,6 @@ export default function MeetingRoom({ meetingId, user }) {
       const recorder = new MediaRecorder(destination.stream, { mimeType });
       recordingChunksRef.current = [];
       recorder.ondataavailable = e => { if (e.data.size > 0) recordingChunksRef.current.push(e.data); };
-
       recorder.onstop = async () => {
         const chunks = [...recordingChunksRef.current];
         recordingChunksRef.current = [];
@@ -556,17 +515,10 @@ export default function MeetingRoom({ meetingId, user }) {
         try {
           toast.loading('Syncing per-device audio logs...', { id: 'upload' });
 
-          // 1. Flush our own final chunk to server queue
           await stopMyRecording();
 
-          // 2. Upload our own chunks to S3 first
-          await flushMyChunks();
+          await new Promise(r => setTimeout(r, 1000));
 
-          // 3. Small buffer to allow any non-host participants' flush-my-chunks
-          //    calls to complete on the server before we collect the combined result.
-          await new Promise(r => setTimeout(r, 2000));
-
-          // 4. Collect all flushed per-device audio from server
           const perDeviceAudio = await new Promise(resolve => {
             const timeout = setTimeout(() => {
               console.warn('Per-device audio sync timed out');
@@ -581,22 +533,19 @@ export default function MeetingRoom({ meetingId, user }) {
             socketRef.current?.emit('get-transcript-queue', { meetingId });
           });
 
-          // 5. Upload mixed recording + all per-device audio to backend
           const fd = new FormData();
           fd.append('recording', blob, 'meeting-recording.webm');
           if (perDeviceAudio.length > 0) {
             fd.append('perDeviceAudio', JSON.stringify(perDeviceAudio));
           }
 
-          toast.loading('Uploading and starting AI analysis...', { id: 'upload' });
+          toast.loading('Uploading recording...', { id: 'upload' });
           await api.post(`/meetings/${meetingId}/upload-recording`, fd, {
             headers: { 'Content-Type': 'multipart/form-data' }
           });
 
           toast.success(
-            perDeviceAudio.length > 0
-              ? `Done! Synced ${perDeviceAudio.length} speaker channels for accurate attribution.`
-              : 'Done! Processing mixed audio for AI analysis.',
+            'Recording saved! Go to the meeting page and click "Analyze Meeting" when ready.',
             { id: 'upload', duration: 6000 }
           );
         } catch (e) {
@@ -604,82 +553,36 @@ export default function MeetingRoom({ meetingId, user }) {
           toast.error('Failed to upload recording. Please try manual upload in history.', { id: 'upload' });
         }
       };
-
-      recorder.start(1000);
-      mediaRecorderRef.current = recorder;
-      socketRef.current?.emit('start-recording', { meetingId });
-      setIsRecording(true);
-      toast.success('Recording started');
+      recorder.start(1000); mediaRecorderRef.current = recorder;
+      socketRef.current?.emit('start-recording', { meetingId }); setIsRecording(true); toast.success('Recording started');
     } catch (e) { toast.error('Could not start recording: ' + e.message); }
-  }, [meetingId, remoteStreams, stopMyRecording, flushMyChunks]);
+  }, [meetingId, remoteStreams, stopMyRecording]);
 
-  const stopRecording = useCallback(() => {
-    if (mediaRecorderRef.current?.state !== 'inactive') mediaRecorderRef.current?.stop();
-    socketRef.current?.emit('stop-recording', { meetingId });
-    setIsRecording(false);
-    toast.success('Recording stopped — uploading...');
-  }, [meetingId]);
+  const stopRecording = useCallback(() => { if (mediaRecorderRef.current?.state !== 'inactive') mediaRecorderRef.current?.stop(); socketRef.current?.emit('stop-recording', { meetingId }); setIsRecording(false); toast.success('Recording stopped — uploading...'); }, [meetingId]);
+  const leaveMeeting = useCallback(() => { stopMyRecording(); cleanup(); router.push('/meetings/history'); }, [stopMyRecording]);
 
-  // FIX 3: leaveMeeting flushes chunks before leaving
-  // A non-host who manually clicks Leave mid-recording previously lost their
-  // audio chunks. Now we flush to S3 first (guarded by isRecording so we don't
-  // add unnecessary latency when no recording is active).
-  const leaveMeeting = useCallback(async () => {
-    await stopMyRecording();
-    if (socketRef.current?.connected && isRecording) {
-      await flushMyChunks();
-    }
-    cleanup();
-    router.push('/meetings/history');
-  }, [stopMyRecording, flushMyChunks, isRecording]);
-
-  // FIX 2: handleEndMeeting — guard flushMyChunks in the non-recording branch
-  // The original else branch called flushMyChunks() unconditionally, which
-  // would hang for up to 20s if the socket was no longer connected.
-  // We now check socket.connected before calling it.
   const handleEndMeeting = useCallback(async () => {
     if (!isHost) return;
     setIsEndingMeeting(true);
     try {
       await api.post(`/meetings/${meetingId}/end`);
-
       if (isRecording && mediaRecorderRef.current?.state !== 'inactive') {
         toast.loading('Saving recording...', { id: 'end-meeting' });
-
-        // Wrap recorder.onstop in a Promise so we can await full completion
         await new Promise((resolve) => {
           const originalOnStop = mediaRecorderRef.current.onstop;
           mediaRecorderRef.current.onstop = async (e) => {
-            try {
-              if (originalOnStop) await originalOnStop.call(mediaRecorderRef.current, e);
-            } catch (err) {
-              console.warn('recorder.onstop error during end meeting:', err.message);
-            } finally {
-              resolve();
-            }
+            try { if (originalOnStop) await originalOnStop.call(mediaRecorderRef.current, e); } catch (_) { }
+            finally { resolve(); }
           };
           mediaRecorderRef.current.stop();
           socketRef.current?.emit('stop-recording', { meetingId });
           setIsRecording(false);
         });
-
         toast.dismiss('end-meeting');
-      } else {
-        // No active recording — flush our own chunks, but only if socket is live
-        await stopMyRecording();
-        if (socketRef.current?.connected) {
-          await flushMyChunks();
-        }
-      }
-
-      toast.success('Meeting ended');
-      cleanup();
-      router.push(`/meetings/${meetingId}`);
-    } catch (e) {
-      toast.error(e?.response?.data?.message || 'Failed to end meeting');
-      setIsEndingMeeting(false);
-    }
-  }, [isHost, isRecording, meetingId, stopMyRecording, flushMyChunks]);
+      } else { stopMyRecording(); }
+      toast.success('Meeting ended'); cleanup(); router.push(`/meetings/${meetingId}`);
+    } catch (e) { toast.error(e?.response?.data?.message || 'Failed to end meeting'); setIsEndingMeeting(false); }
+  }, [isHost, isRecording, meetingId, stopMyRecording]);
 
   if (meetingCancelled) return (
     <div className="h-screen flex items-center justify-center bg-slate-950">
