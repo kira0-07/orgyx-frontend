@@ -54,6 +54,49 @@ const adminNavGroups = [
   }
 ]
 
+const SidebarNav = ({ onClose, pathname, sidebarCollapsed, isAdmin }) => {
+  const navGroups = isAdmin ? adminNavGroups : userNavGroups;
+  return (
+    <div className="flex-1 overflow-y-auto py-4 px-3 space-y-6 scrollbar-none">
+      {navGroups.map((group, idx) => (
+        <div key={idx}>
+          {!sidebarCollapsed && (
+            <p className="px-3 text-xs font-medium uppercase tracking-wider text-muted-foreground mb-2">
+              {group.label}
+            </p>
+          )}
+          <nav className="space-y-1">
+            {group.items.map((item) => {
+              const active = pathname === item.href
+              return (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  onClick={onClose}
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group ${
+                    active
+                      ? 'bg-primary/10 text-primary font-medium dark:bg-primary/20'
+                      : 'text-muted-foreground hover:bg-surface-hover hover:text-foreground'
+                  }`}
+                  title={sidebarCollapsed ? item.name : undefined}
+                >
+                  <div className={`relative ${active ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'}`}>
+                    <item.icon className="h-[18px] w-[18px] stroke-[2px]" />
+                    {active && (
+                      <div className="absolute -left-[14px] top-1/2 -translate-y-1/2 w-1 h-5 bg-primary rounded-r-md" />
+                    )}
+                  </div>
+                  {!sidebarCollapsed && <span>{item.name}</span>}
+                </Link>
+              )
+            })}
+          </nav>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export default function DashboardLayout({ children }) {
   const pathname = usePathname()
   const { user, logout } = useAuthStore()
@@ -98,48 +141,6 @@ export default function DashboardLayout({ children }) {
     window.location.href = '/login'
   }
 
-  const navGroups = isAdmin ? adminNavGroups : userNavGroups
-
-  const SidebarNav = ({ onClose }) => (
-    <div className="flex-1 overflow-y-auto py-4 px-3 space-y-6 scrollbar-none">
-      {navGroups.map((group, idx) => (
-        <div key={idx}>
-          {!sidebarCollapsed && (
-            <p className="px-3 text-xs font-medium uppercase tracking-wider text-muted-foreground mb-2">
-              {group.label}
-            </p>
-          )}
-          <nav className="space-y-1">
-            {group.items.map((item) => {
-              const active = pathname === item.href
-              return (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  onClick={onClose}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group ${
-                    active
-                      ? 'bg-primary/10 text-primary font-medium dark:bg-primary/20'
-                      : 'text-muted-foreground hover:bg-surface-hover hover:text-foreground'
-                  }`}
-                  title={sidebarCollapsed ? item.name : undefined}
-                >
-                  <div className={`relative ${active ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'}`}>
-                    <item.icon className="h-[18px] w-[18px] stroke-[2px]" />
-                    {active && (
-                      <div className="absolute -left-[14px] top-1/2 -translate-y-1/2 w-1 h-5 bg-primary rounded-r-md" />
-                    )}
-                  </div>
-                  {!sidebarCollapsed && <span>{item.name}</span>}
-                </Link>
-              )
-            })}
-          </nav>
-        </div>
-      ))}
-    </div>
-  )
-
   return (
     <div className="min-h-screen bg-background text-foreground flex">
 
@@ -159,7 +160,7 @@ export default function DashboardLayout({ children }) {
                 <X className="h-5 w-5" />
               </Button>
             </div>
-            <SidebarNav onClose={() => setSidebarOpen(false)} />
+            <SidebarNav onClose={() => setSidebarOpen(false)} pathname={pathname} sidebarCollapsed={sidebarCollapsed} isAdmin={isAdmin} />
           </div>
         </div>
       )}
@@ -180,7 +181,7 @@ export default function DashboardLayout({ children }) {
           </Link>
         </div>
         
-        <SidebarNav onClose={() => {}} />
+        <SidebarNav onClose={() => {}} pathname={pathname} sidebarCollapsed={sidebarCollapsed} isAdmin={isAdmin} />
 
         <div className="mt-auto p-4 border-t border-border">
           <Button 
