@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -103,7 +102,7 @@ export default function NewMeetingPage() {
   const selectedDomain = meetingDomains.find(d => d.value === formData.domain);
 
   return (
-    <DashboardLayout>
+    <>
       <div className="h-[calc(100vh-10rem)] flex flex-col min-h-[600px]">
         {/* Header */}
         <div className="mb-6 shrink-0 flex justify-between items-end">
@@ -382,6 +381,6 @@ export default function NewMeetingPage() {
           </div>
         </form>
       </div>
-    </DashboardLayout>
+    </>
   );
 }

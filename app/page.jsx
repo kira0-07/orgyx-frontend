@@ -1,7 +1,19 @@
+'use client';
+
 import { MarketingNavbar } from '@/components/layout/MarketingNavbar';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { ArrowRight, Gauge, ShieldCheck, Users, Search, Plus, Bell, ChevronDown, MoreHorizontal, LayoutDashboard, Route, CheckSquare, Layers, CreditCard, Settings } from 'lucide-react';
+import { motion } from 'framer-motion';
+import dynamic from 'next/dynamic';
+
+const Hero3DCanvas = dynamic(
+  () => import('@/components/shared/Hero3DCanvas').then(mod => mod.Hero3DCanvas),
+  { 
+    ssr: false, 
+    loading: () => <div className="w-full h-full animate-pulse bg-primary/5 rounded-full blur-[100px]" /> 
+  }
+);
 
 export default function LandingPage() {
   return (
@@ -13,15 +25,30 @@ export default function LandingPage() {
         {/* Soft decorative background gradients (very subtle) */}
         <div className="absolute top-0 right-0 -mr-48 -mt-48 w-[600px] h-[600px] bg-[#f0eee6]/80 dark:bg-primary/5 rounded-full blur-[120px] pointer-events-none transition-colors duration-700" />
         
+        {/* 3D Background */}
+        <div className="absolute top-0 right-0 w-full lg:w-1/2 h-[600px] z-0 opacity-40 lg:opacity-100">
+          <Hero3DCanvas />
+        </div>
+
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-8 items-center z-10 w-full mb-10 lg:mb-12">
           
           {/* Left Column: Typography and CTAs */}
-          <div className="flex flex-col items-start pr-0 lg:pr-12">
-            <h1 className="text-5xl md:text-6xl lg:text-[5rem] font-serif font-medium tracking-tight leading-[1.05] text-[#1c1c1a] dark:text-slate-100 mb-4 text-balance">
+          <motion.div 
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, ease: "easeOut" }}
+            className="flex flex-col items-start pr-0 lg:pr-12"
+          >
+            <motion.h1 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.2 }}
+              className="text-5xl md:text-6xl lg:text-[5rem] font-serif font-medium tracking-tight leading-[1.05] text-[#1c1c1a] dark:text-slate-100 mb-4 text-balance"
+            >
               Elevate Team <br className="hidden md:block"/>
               Collaboration & <br className="hidden md:block"/>
               Workflow Efficiency
-            </h1>
+            </motion.h1>
             
             <p className="text-lg md:text-xl text-[#4a4a48] dark:text-slate-400 max-w-xl leading-snug font-normal mb-8 text-balance">
               The modern operations platform for enterprise teams—trusted, intuitive, and built to scale performance.
@@ -39,10 +66,15 @@ export default function LandingPage() {
                 </Button>
               </Link>
             </div>
-          </div>
+          </motion.div>
 
           {/* Right Column: Dashboard Mockup */}
-          <div className="relative w-full h-[550px] flex justify-end">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9, x: 20 }}
+            animate={{ opacity: 1, scale: 1, x: 0 }}
+            transition={{ duration: 0.8, delay: 0.4, ease: "easeOut" }}
+            className="relative w-full h-[550px] flex justify-end"
+          >
             {/* The Mockup Box */}
             <div className="absolute right-0 lg:-right-12 top-6 w-[110%] lg:w-[130%] h-full max-h-[550px] rounded-[1.5rem] bg-white dark:bg-[#0b1120] border border-[#e8e6e1] dark:border-slate-800 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.08)] dark:shadow-2xl overflow-hidden flex flex-col font-sans">
               
@@ -245,7 +277,7 @@ export default function LandingPage() {
                 </div>
               </div>
             </div>
-          </div>
+          </motion.div>
         </div>
         
         {/* Trust Metrics Bar at the very bottom */}

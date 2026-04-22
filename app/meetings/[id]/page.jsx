@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import DashboardLayout from '@/components/layout/DashboardLayout';
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -403,7 +403,7 @@ export default function MeetingDetailPage({ params }) {
 
   if (isLoading) {
     return (
-      <DashboardLayout>
+      <>
         <div className="space-y-6">
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="icon" onClick={() => router.push('/meetings/history')}><ArrowLeft className="h-5 w-5" /></Button>
@@ -411,24 +411,24 @@ export default function MeetingDetailPage({ params }) {
           </div>
           <CardSkeleton />
         </div>
-      </DashboardLayout>
+      </>
     );
   }
 
   if (!meeting) {
     return (
-      <DashboardLayout>
+      <>
         <div className="text-center py-12">
           <AlertCircle className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
           <p className="text-muted-foreground">Meeting not found</p>
           <Button className="mt-4" onClick={() => router.push('/meetings/history')}>Back to Meetings</Button>
         </div>
-      </DashboardLayout>
+      </>
     );
   }
 
   return (
-    <DashboardLayout>
+    <>
       <div className="space-y-6">
 
         {showEndConfirm && (
@@ -687,6 +687,6 @@ export default function MeetingDetailPage({ params }) {
           </div>
         </div>
       </div>
-    </DashboardLayout>
+    </>
   );
 }

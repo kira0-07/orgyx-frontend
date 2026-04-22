@@ -134,15 +134,16 @@ function NetworkWarningBanner({ onDismiss }) {
 
 function ControlsBar({ isAudioEnabled, isVideoEnabled, isScreenSharing, isMobile, isHandRaised, isRecording, isHost, isEndingMeeting, toggleAudio, toggleVideo, toggleScreenShare, toggleHand, startRecording, stopRecording, handleEndMeeting, leaveMeeting }) {
   return (
-    <div className="bg-slate-900/95 backdrop-blur border-t border-slate-800 px-4 py-3 shrink-0">
-      <div className="flex items-center justify-center gap-2 flex-wrap">
-        <CtrlBtn onClick={toggleAudio} label={isAudioEnabled ? 'Mute' : 'Unmute'} danger={!isAudioEnabled}>{isAudioEnabled ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}</CtrlBtn>
-        <CtrlBtn onClick={toggleVideo} label={isVideoEnabled ? 'Stop Video' : 'Start Video'} danger={!isVideoEnabled}>{isVideoEnabled ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}</CtrlBtn>
-        {!isMobile && (<CtrlBtn onClick={toggleScreenShare} label={isScreenSharing ? 'Stop Share' : 'Share'} highlight={isScreenSharing}>{isScreenSharing ? <StopCircle className="h-5 w-5" /> : <ScreenShare className="h-5 w-5" />}</CtrlBtn>)}
-        <CtrlBtn onClick={toggleHand} label={isHandRaised ? 'Lower Hand' : 'Raise Hand'} warn={isHandRaised}><Hand className="h-5 w-5" /></CtrlBtn>
-        {isHost && (<CtrlBtn onClick={isRecording ? stopRecording : startRecording} label={isRecording ? 'Stop Rec' : 'Record'} danger={isRecording}><Circle className={cn('h-5 w-5', isRecording && 'fill-current')} /></CtrlBtn>)}
-        {isHost && (<div className="flex flex-col items-center gap-1"><button onClick={handleEndMeeting} disabled={isEndingMeeting} className="h-12 w-12 rounded-full bg-red-700 hover:bg-red-800 disabled:opacity-50 flex items-center justify-center transition-colors"><StopCircle className="h-5 w-5 text-white" /></button><span className="text-xs text-slate-500">End</span></div>)}
-        <div className="flex flex-col items-center gap-1"><button onClick={leaveMeeting} className="h-12 w-12 rounded-full bg-red-600 hover:bg-red-700 flex items-center justify-center transition-colors"><Phone className="h-5 w-5 text-white rotate-[135deg]" /></button><span className="text-xs text-slate-500">Leave</span></div>
+    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-black/60 hover:bg-black/80 backdrop-blur-md rounded-2xl border border-white/10 px-6 py-3 transition-all z-40 transform shadow-2xl">
+      <div className="flex items-center justify-center gap-4 flex-wrap">
+        <CtrlBtn onClick={toggleAudio} label={isAudioEnabled ? 'Mute' : 'Unmute'} danger={!isAudioEnabled}><span className={isAudioEnabled ? "text-white" : ""}>{isAudioEnabled ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}</span></CtrlBtn>
+        <CtrlBtn onClick={toggleVideo} label={isVideoEnabled ? 'Stop Video' : 'Start Video'} danger={!isVideoEnabled}><span className={isVideoEnabled ? "text-white" : ""}>{isVideoEnabled ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}</span></CtrlBtn>
+        {!isMobile && (<CtrlBtn onClick={toggleScreenShare} label={isScreenSharing ? 'Stop Share' : 'Share Screen'} highlight={isScreenSharing}><span className={isScreenSharing ? "text-blue-400" : "text-green-400"}>{isScreenSharing ? <StopCircle className="h-5 w-5" /> : <ScreenShare className="h-5 w-5" />}</span></CtrlBtn>)}
+        <CtrlBtn onClick={toggleHand} label={isHandRaised ? 'Lower Hand' : 'Raise Hand'} warn={isHandRaised}><span className={isHandRaised ? "text-yellow-400" : "text-white"}><Hand className="h-5 w-5" /></span></CtrlBtn>
+        {isHost && (<CtrlBtn onClick={isRecording ? stopRecording : startRecording} label={isRecording ? 'Stop Rec' : 'Record'} danger={isRecording}><Circle className={cn('h-5 w-5', isRecording ? 'fill-red-500 text-red-500' : 'text-white')} /></CtrlBtn>)}
+        <div className="w-[1px] h-10 bg-white/10 mx-2" />
+        {isHost && (<div className="flex flex-col items-center gap-1"><button onClick={handleEndMeeting} disabled={isEndingMeeting} className="h-12 w-16 rounded-xl bg-red-600 hover:bg-red-700 disabled:opacity-50 flex items-center justify-center transition-colors"><span className="text-sm font-semibold text-white">End</span></button></div>)}
+        <div className="flex flex-col items-center gap-1"><button onClick={leaveMeeting} className="h-12 w-16 rounded-xl bg-[#252528] hover:bg-[#323236] flex items-center justify-center transition-colors border border-white/10"><span className="text-sm font-semibold text-red-500">Leave</span></button></div>
       </div>
     </div>
   );
@@ -379,7 +380,17 @@ export default function MeetingRoom({ meetingId, user }) {
           setChatOpen(prev => { if (!prev) { setUnreadCount(c => c + 1); toast(`💬 ${senderName}: ${message.substring(0, 40)}`, { duration: 3000, style: { background: '#1e293b', color: '#f1f5f9', border: '1px solid #334155' } }); } return prev; });
         });
 
-        socketRef.current.on('hand-raised', ({ userId }) => { if (!mounted) return; setRaisedHands(prev => new Set([...prev, userId?.toString()])); if (userId?.toString() !== myId) toast(`✋ ${getParticipantName(userId)} raised hand`, { duration: 3000 }); });
+        socketRef.current.on('hand-raised', ({ userId }) => { 
+          if (!mounted) return; 
+          setRaisedHands(prev => new Set([...prev, userId?.toString()])); 
+          if (userId?.toString() !== myId) {
+            toast(`✋ ${getParticipantName(userId)} raised their hand`, { 
+              duration: 5000, 
+              position: 'bottom-right',
+              style: { backgroundColor: '#3b82f6', color: '#ffffff', fontWeight: '500' }
+            }); 
+          }
+        });
         socketRef.current.on('hand-lowered', ({ userId }) => { if (!mounted) return; setRaisedHands(prev => { const n = new Set(prev); n.delete(userId?.toString()); return n; }); });
 
         socketRef.current.on('recording-started', () => {
@@ -625,32 +636,32 @@ export default function MeetingRoom({ meetingId, user }) {
   const remoteProps = (uid) => ({ isMuted: participantMediaState[uid]?.audio === false, isCameraOff: participantMediaState[uid]?.video === false });
 
   return (
-    <div className="h-screen bg-slate-950 flex flex-col overflow-hidden">
+    <div className={cn("bg-[#0b0c10] text-slate-200 flex flex-col transition-colors fixed inset-0 z-[100]", isMobile ? "min-h-screen" : "h-screen overflow-hidden")}>
       {fullscreenUserId && (
-        <div ref={fullscreenContainerRef} className="fixed inset-0 z-50 bg-black flex flex-col">
-          <div className="flex-1 min-h-0">
+        <div ref={fullscreenContainerRef} className="fixed inset-0 z-[110] bg-black flex flex-col">
+          <div className="flex-1 min-h-0 relative">
             {fullscreenUserId === 'local' ? (
               <LocalTile videoRef={setLocalVideoRef} name={myName} isHost={isHost} isAudioEnabled={isAudioEnabled} isVideoEnabled={isVideoEnabled} isScreenSharing={isScreenSharing} isHandRaised={raisedHands.has(myId)} isPinned={false} onPin={() => { }} onFullscreen={exitFullscreen} isFullscreen large stream={localStreamRef.current} audioEnabled={isAudioEnabled} isActiveSpeaker={activeSpeakerId === myId} audioLevel={ringLevels[myId] || 0} onAudioLevel={lvl => handleAudioLevel(myId, lvl)} />
             ) : (
               <RemoteTile userId={fullscreenUserId} stream={remoteStreams[fullscreenUserId]} name={getParticipantName(fullscreenUserId)} isHandRaised={raisedHands.has(fullscreenUserId)} isPinned={false} onPin={() => { }} onFullscreen={exitFullscreen} isFullscreen large isActiveSpeaker={activeSpeakerId === fullscreenUserId} audioLevel={ringLevels[fullscreenUserId] || 0} onAudioLevel={lvl => handleAudioLevel(fullscreenUserId, lvl)} {...remoteProps(fullscreenUserId)} />
             )}
+            <ControlsBar {...controlsProps} />
           </div>
-          <ControlsBar {...controlsProps} />
         </div>
       )}
 
-      <header className="bg-slate-900 border-b border-slate-800 px-4 py-3 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-3">
-          <h1 className="font-semibold text-slate-100">Meeting Room</h1>
-          {isRecording && (<Badge className="bg-red-500/20 text-red-400 flex items-center gap-1.5 animate-pulse"><Circle className="h-2 w-2 fill-red-400" /> Recording</Badge>)}
-          {raisedHands.size > 0 && (<Badge className="bg-yellow-500/20 text-yellow-400">✋ {raisedHands.size}</Badge>)}
-          {networkWarning && (<Badge className="bg-amber-500/20 text-amber-400 flex items-center gap-1.5"><WifiOff className="h-3 w-3" /> Unstable</Badge>)}
+      <header className="absolute top-0 left-0 right-0 z-30 bg-gradient-to-b from-black/80 to-transparent px-6 py-4 flex items-center justify-between shrink-0 pointer-events-none">
+        <div className="flex items-center gap-3 pointer-events-auto">
+          <h1 className="font-semibold text-white/90">Meeting Room</h1>
+          {isRecording && (<Badge className="bg-red-500 text-white border-0 flex items-center gap-1.5 animate-pulse shadow-lg"><Circle className="h-2 w-2 fill-white" /> Recording</Badge>)}
+          {raisedHands.size > 0 && (<Badge className="bg-blue-500 text-white border-0 shadow-lg">✋ {raisedHands.size}</Badge>)}
+          {networkWarning && (<Badge className="bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center gap-1.5"><WifiOff className="h-3 w-3" /> Unstable</Badge>)}
         </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5 text-slate-400 text-sm"><Users className="h-4 w-4" /><span>{totalParticipants}</span></div>
-          <button onClick={() => setChatOpen(p => !p)} className={cn('relative p-2 rounded-lg transition-colors', chatOpen ? 'bg-blue-500/20 text-blue-400' : 'text-slate-400 hover:bg-slate-800')}>
+        <div className="flex items-center gap-3 pointer-events-auto">
+          <div className="flex items-center gap-1.5 text-muted-foreground text-sm"><Users className="h-4 w-4" /><span>{totalParticipants}</span></div>
+          <button onClick={() => setChatOpen(p => !p)} className={cn('relative p-2 rounded-lg transition-colors', chatOpen ? 'bg-primary/20 text-primary' : 'text-muted-foreground hover:bg-secondary hover:text-foreground')}>
             <MessageSquare className="h-5 w-5" />
-            {unreadCount > 0 && (<span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-4 h-4 rounded-full flex items-center justify-center font-bold">{unreadCount > 9 ? '9+' : unreadCount}</span>)}
+            {unreadCount > 0 && (<span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-xs w-4 h-4 rounded-full flex items-center justify-center font-bold">{unreadCount > 9 ? '9+' : unreadCount}</span>)}
           </button>
         </div>
       </header>
@@ -700,26 +711,28 @@ export default function MeetingRoom({ meetingId, user }) {
         </div>
 
         {chatOpen && (
-          <div className="w-80 bg-slate-900 border-l border-slate-800 flex flex-col shrink-0">
-            <div className="p-4 border-b border-slate-800 flex items-center justify-between shrink-0"><span className="font-semibold text-slate-200">Chat</span><button onClick={() => setChatOpen(false)} className="text-slate-400 hover:text-slate-200"><X className="h-4 w-4" /></button></div>
+          <div className="w-80 bg-card border-l border-border flex flex-col shrink-0">
+            <div className="p-4 border-b border-border flex items-center justify-between shrink-0"><span className="font-semibold text-foreground">Chat</span><button onClick={() => setChatOpen(false)} className="text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button></div>
             <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
-              {messages.length === 0 ? (<p className="text-slate-500 text-center text-sm mt-12">No messages yet 👋</p>) : messages.map(msg => (
+              {messages.length === 0 ? (<p className="text-muted-foreground text-center text-sm mt-12">No messages yet 👋</p>) : messages.map(msg => (
                 <div key={msg.id} className={cn('flex flex-col gap-0.5', msg.isOwn ? 'items-end' : 'items-start')}>
-                  <span className="text-xs text-slate-500 px-1">{msg.userName}</span>
-                  <span className={cn('inline-block px-3 py-2 rounded-2xl text-sm max-w-[220px] break-words', msg.isOwn ? 'bg-blue-600 text-white rounded-br-sm' : 'bg-slate-700 text-slate-100 rounded-bl-sm')}>{msg.message}</span>
-                  <span className="text-xs text-slate-600 px-1">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                  <span className="text-xs text-muted-foreground px-1">{msg.userName}</span>
+                  <span className={cn('inline-block px-3 py-2 rounded-2xl text-sm max-w-[220px] break-words', msg.isOwn ? 'bg-primary text-primary-foreground rounded-br-sm' : 'bg-muted text-foreground rounded-bl-sm')}>{msg.message}</span>
+                  <span className="text-xs text-muted-foreground/60 px-1">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                 </div>
               ))}
               <div ref={chatBottomRef} />
             </div>
-            <form onSubmit={e => { e.preventDefault(); const message = chatInput.trim(); if (!message || !socketRef.current) return; setMessages(prev => [...prev, { id: Date.now(), userId: myId, userName: myName, message, timestamp: new Date().toISOString(), isOwn: true }]); socketRef.current.emit('chat-message', { meetingId, message }); setChatInput(''); }} className="p-3 border-t border-slate-800 flex gap-2 shrink-0">
-              <input type="text" value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder="Type a message..." className="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-blue-500" />
-              <button type="submit" disabled={!chatInput.trim()} className="bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white px-3 py-2 rounded-xl text-sm transition-colors">Send</button>
+            <form onSubmit={e => { e.preventDefault(); const message = chatInput.trim(); if (!message || !socketRef.current) return; setMessages(prev => [...prev, { id: Date.now(), userId: myId, userName: myName, message, timestamp: new Date().toISOString(), isOwn: true }]); socketRef.current.emit('chat-message', { meetingId, message }); setChatInput(''); }} className="p-3 border-t border-border flex gap-2 shrink-0">
+              <input type="text" value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder="Type a message..." className="flex-1 bg-background border border-input rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary" />
+              <button type="submit" disabled={!chatInput.trim()} className="bg-primary hover:bg-primary/90 disabled:opacity-40 text-primary-foreground px-3 py-2 rounded-xl text-sm transition-colors">Send</button>
             </form>
           </div>
         )}
       </div>
-      <ControlsBar {...controlsProps} />
+      
+      {/* Floating Controls Bar at Bottom */}
+      {!fullscreenUserId && <ControlsBar {...controlsProps} />}
     </div>
   );
 }
@@ -727,12 +740,12 @@ export default function MeetingRoom({ meetingId, user }) {
 function LocalTile({ videoRef, name, isHost, isAudioEnabled, isVideoEnabled, isScreenSharing, isHandRaised, isPinned, onPin, onFullscreen, large, thumbnail, isFullscreen, spanFull, stream, isActiveSpeaker, onAudioLevel, audioEnabled, audioLevel }) {
   useAudioLevel(stream, audioEnabled !== false, onAudioLevel);
   return (
-    <div className={cn('relative bg-slate-800 rounded-xl overflow-hidden group', large ? 'w-full h-full' : thumbnail ? 'w-40 h-28 shrink-0' : 'w-full h-full', spanFull && 'col-span-2')}>
+    <div className={cn('relative bg-muted rounded-xl overflow-hidden group', large ? 'w-full h-full' : thumbnail ? 'w-40 h-28 shrink-0' : 'w-full h-full', spanFull && 'col-span-2')}>
       <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover" />
       {!isVideoEnabled && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-800 gap-2">
-          <div className="w-14 h-14 rounded-full bg-slate-700 flex items-center justify-center"><CameraOff className="h-7 w-7 text-slate-400" /></div>
-          {!thumbnail && <span className="text-slate-400 text-xs">Camera off</span>}
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-muted gap-2">
+          <div className="w-14 h-14 rounded-full bg-secondary flex items-center justify-center"><CameraOff className="h-7 w-7 text-muted-foreground" /></div>
+          {!thumbnail && <span className="text-muted-foreground text-xs">Camera off</span>}
         </div>
       )}
       <SpeakerRing isActive={isActiveSpeaker} level={audioLevel} thumbnail={thumbnail} />
@@ -763,14 +776,14 @@ function RemoteTile({ userId, stream, name, isHandRaised, isPinned, onPin, onFul
   const initials = name.split(' ').map(n => n[0] || '').join('').slice(0, 2).toUpperCase() || '??';
   const showCameraOff = isCameraOff || !hasVideo;
   return (
-    <div className={cn('relative bg-slate-800 rounded-xl overflow-hidden group', large ? 'w-full h-full' : thumbnail ? 'w-40 h-28 shrink-0' : 'w-full h-full', spanFull && 'col-span-2')}>
+    <div className={cn('relative bg-muted rounded-xl overflow-hidden group', large ? 'w-full h-full' : thumbnail ? 'w-40 h-28 shrink-0' : 'w-full h-full', spanFull && 'col-span-2')}>
       <video ref={videoRef} autoPlay playsInline className={cn('w-full h-full object-cover', showCameraOff && 'hidden')} />
       {showCameraOff && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-800 gap-2">
-          <div className="w-14 h-14 rounded-full bg-slate-600 flex items-center justify-center">
-            {isCameraOff ? <CameraOff className="h-7 w-7 text-slate-400" /> : <span className="text-xl font-bold text-slate-200">{initials}</span>}
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-muted gap-2">
+          <div className="w-14 h-14 rounded-full bg-secondary flex items-center justify-center">
+            {isCameraOff ? <CameraOff className="h-7 w-7 text-muted-foreground" /> : <span className="text-xl font-bold text-foreground">{initials}</span>}
           </div>
-          {!thumbnail && <span className="text-slate-400 text-xs">{isCameraOff ? `${name} · Camera off` : name}</span>}
+          {!thumbnail && <span className="text-muted-foreground text-xs">{isCameraOff ? `${name} · Camera off` : name}</span>}
         </div>
       )}
       <SpeakerRing isActive={isActiveSpeaker} level={audioLevel} thumbnail={thumbnail} />
@@ -794,8 +807,8 @@ function TileBtn({ onClick, title, children }) {
 function CtrlBtn({ onClick, children, label, danger, highlight, warn }) {
   return (
     <div className="flex flex-col items-center gap-1">
-      <button onClick={onClick} className={cn('h-12 w-12 rounded-full border flex items-center justify-center transition-colors', danger ? 'bg-red-500/20 border-red-500/40 text-red-400 hover:bg-red-500/30' : highlight ? 'bg-blue-500/20 border-blue-500/40 text-blue-400 hover:bg-blue-500/30' : warn ? 'bg-yellow-500/20 border-yellow-500/40 text-yellow-400 hover:bg-yellow-500/30' : 'bg-slate-700 border-slate-600 text-slate-200 hover:bg-slate-600')}>{children}</button>
-      <span className="text-xs text-slate-500">{label}</span>
+      <button onClick={onClick} className={cn('h-12 w-12 rounded-xl flex items-center justify-center transition-all duration-200', danger ? 'bg-[#3b1212] border border-red-500/30 hover:bg-[#4a1616]' : highlight ? 'bg-[#152445] border border-blue-500/30 hover:bg-[#1a2d56]' : warn ? 'bg-[#382b13] border border-yellow-500/30 hover:bg-[#473617]' : 'bg-[#252528] border border-white/5 hover:bg-[#323236]')}>{children}</button>
+      <span className="text-[10px] text-white/70 font-medium tracking-wide">{label}</span>
     </div>
   );
 }

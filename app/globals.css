@@ -4,66 +4,68 @@
 
 @layer base {
   :root {
-    --background: 225 15% 10%;
+    /* Stitch MCP: "The Kinetic Void" Dark Mode Base */
+    --background: 230 20% 4%;
     --foreground: 210 20% 92%;
-    --card: 225 14% 9%;
+    --card: 230 18% 7%;
     --card-foreground: 210 20% 92%;
-    --surface: 225 14% 12%;
-    --surface-hover: 225 14% 15%;
-    --popover: 225 14% 9%;
+    --surface: 230 16% 9%;
+    --surface-hover: 230 16% 12%;
+    --popover: 230 18% 7%;
     --popover-foreground: 210 20% 92%;
-    --primary: 220 60% 55%;
-    --primary-foreground: 210 20% 92%;
-    --secondary: 225 14% 15%;
+    --primary: 230 90% 65%; /* Soft Neon Blue */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 230 15% 14%;
     --secondary-foreground: 210 20% 92%;
-    --muted: 225 14% 13%;
+    --muted: 230 15% 12%;
     --muted-foreground: 215 15% 55%;
-    --accent: 225 14% 15%;
+    --accent: 230 15% 15%;
     --accent-foreground: 210 20% 92%;
-    --destructive: 0 55% 52%;
+    --destructive: 0 70% 55%;
     --destructive-foreground: 210 20% 92%;
-    --border: 225 12% 16%;
-    --input: 225 12% 16%;
-    --ring: 220 60% 55%;
-    --radius: 0.6rem;
+    --border: 230 15% 12%;
+    --input: 230 15% 12%;
+    --ring: 230 90% 65%;
+    --radius: 0.75rem; /* Smoother corner shapes */
     
-    --rag-red: 0 55% 52%;
+    --rag-red: 0 70% 55%;
     --rag-amber: 38 70% 52%;
     --rag-green: 152 45% 45%;
     
     --kpi-up: 152 45% 45%;
-    --kpi-down: 0 55% 52%;
+    --kpi-down: 0 70% 55%;
   }
 
   .light {
-    --background: 0 0% 98%;
-    --foreground: 225 20% 12%;
+    /* Stitch MCP: "The Digital Atrium" Light Mode Base */
+    --background: 40 20% 98%;
+    --foreground: 230 25% 10%;
     --card: 0 0% 100%;
-    --card-foreground: 225 20% 12%;
-    --surface: 220 14% 96%;
-    --surface-hover: 220 14% 92%;
+    --card-foreground: 230 25% 10%;
+    --surface: 40 15% 95%;
+    --surface-hover: 40 15% 91%;
     --popover: 0 0% 100%;
-    --popover-foreground: 225 20% 12%;
-    --primary: 220 65% 48%;
+    --popover-foreground: 230 25% 10%;
+    --primary: 230 85% 50%; /* Vibrant Royal Blue */
     --primary-foreground: 0 0% 100%;
-    --secondary: 220 14% 92%;
-    --secondary-foreground: 225 20% 12%;
-    --muted: 220 14% 92%;
-    --muted-foreground: 215 10% 50%;
-    --accent: 220 14% 92%;
-    --accent-foreground: 225 20% 12%;
-    --destructive: 0 60% 48%;
+    --secondary: 40 15% 90%;
+    --secondary-foreground: 230 25% 10%;
+    --muted: 40 15% 90%;
+    --muted-foreground: 220 15% 45%;
+    --accent: 40 15% 90%;
+    --accent-foreground: 230 25% 10%;
+    --destructive: 0 75% 45%;
     --destructive-foreground: 0 0% 100%;
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
-    --ring: 220 65% 48%;
+    --border: 40 15% 88%;
+    --input: 40 15% 88%;
+    --ring: 230 85% 50%;
     
-    --rag-red: 0 60% 48%;
+    --rag-red: 0 75% 45%;
     --rag-amber: 38 75% 45%;
     --rag-green: 152 50% 38%;
     
     --kpi-up: 152 50% 38%;
-    --kpi-down: 0 60% 48%;
+    --kpi-down: 0 75% 45%;
   }
 }
 
