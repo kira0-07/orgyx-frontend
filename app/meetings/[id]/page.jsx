@@ -39,6 +39,7 @@ export default function MeetingDetailPage({ params }) {
   const [editingSegmentIdx, setEditingSegmentIdx] = useState(null);
   const [transcriptHasChanges, setTranscriptHasChanges] = useState(false);
   const [isSavingTranscript, setIsSavingTranscript] = useState(false);
+  const [cooldownRemaining, setCooldownRemaining] = useState(0);
 
   const SPEAKER_COLORS = [
     'text-blue-400', 'text-green-400', 'text-purple-400',
@@ -53,6 +54,29 @@ export default function MeetingDetailPage({ params }) {
       return () => clearInterval(interval);
     }
   }, [meeting?.status]);
+
+  // FIX 3: 60-second cooldown after meeting ends before Analyze button becomes available.
+  // If endedAt is missing, secondsSinceEnd = 999, so remaining = Math.max(0, 60-999) = 0
+  // → button is immediately active when endedAt is absent. This is correct behavior.
+  useEffect(() => {
+    const calculateCooldown = () => {
+      const endedAt = meeting?.endedAt;
+      const secondsSinceEnd = endedAt
+        ? Math.floor((Date.now() - new Date(endedAt).getTime()) / 1000)
+        : 999;
+      return Math.max(0, 60 - secondsSinceEnd);
+    };
+
+    setCooldownRemaining(calculateCooldown());
+
+    const interval = setInterval(() => {
+      const remaining = calculateCooldown();
+      setCooldownRemaining(remaining);
+      if (remaining === 0) clearInterval(interval);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [meeting?.endedAt]);
 
   const fetchMeeting = async () => {
     if (!params?.id) return;
@@ -455,9 +479,13 @@ export default function MeetingDetailPage({ params }) {
             {['ready', 'completed', 'processing'].includes(meeting.status) && (
               <Button variant="outline" className="border-border text-foreground hover:bg-muted" onClick={() => setActiveTab('summary')}><FileText className="mr-2 h-4 w-4" />View Summary</Button>
             )}
+            {/* FIX 3: Analyze Meeting button with 60-second cooldown.
+                cooldownRemaining = 0 when: endedAt is missing (999s elapsed → Math.max(0, 60-999) = 0)
+                or when 60+ real seconds have passed since endedAt. Button disabled only during cooldown. */}
             {meeting.status === 'completed' && meeting.recordingUrl && !isProcessing && (
               <Button
                 onClick={async () => {
+                  if (cooldownRemaining > 0) return;
                   try {
                     toast.loading('Starting analysis...', { id: 'analyze' });
                     await api.post(`/meetings/${meeting._id}/analyze`);
@@ -467,10 +495,20 @@ export default function MeetingDetailPage({ params }) {
                     toast.error(error?.response?.data?.message || 'Failed to start analysis', { id: 'analyze' });
                   }
                 }}
-                className="bg-purple-600 hover:bg-purple-700"
+                disabled={cooldownRemaining > 0}
+                className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Mic className="mr-2 h-4 w-4" />
-                Analyze Meeting
+                {cooldownRemaining > 0 ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Analyze in {cooldownRemaining}s
+                  </>
+                ) : (
+                  <>
+                    <Mic className="mr-2 h-4 w-4" />
+                    Analyze Meeting
+                  </>
+                )}
               </Button>
             )}
             {isReady && (<Button onClick={() => router.push(`/meetings/${meeting._id}/schedule-followup`)} className="bg-blue-600 hover:bg-blue-700"><Plus className="mr-2 h-4 w-4" />Schedule Follow-up</Button>)}
@@ -525,7 +563,6 @@ export default function MeetingDetailPage({ params }) {
                         <p className="text-xs text-muted-foreground mb-3">AI has assigned speakers. Click any name to correct it.</p>
                         <ScrollArea className="h-[400px]">
                           <div className="space-y-3 pr-2">
-                            {/* ── FIX: Group consecutive same-speaker segments into one dialogue box ── */}
                             {(() => {
                               const groups = [];
                               transcriptSegments.forEach((seg, i) => {
@@ -550,7 +587,6 @@ export default function MeetingDetailPage({ params }) {
                                           autoFocus
                                           defaultValue={group.speaker}
                                           onChange={(e) => {
-                                            // Correct all segments in this group at once
                                             group.texts.forEach(t => handleSpeakerChange(t.idx, e.target.value));
                                           }}
                                           className="text-sm bg-background border border-border rounded px-2 py-0.5 text-foreground focus:outline-none"
@@ -576,7 +612,6 @@ export default function MeetingDetailPage({ params }) {
                                     )}
                                     <span className="text-xs text-muted-foreground">{formatTime(group.startTime)}</span>
                                   </div>
-                                  {/* All sentences joined — one readable paragraph per speaker turn */}
                                   <p className="text-foreground text-sm leading-relaxed">
                                     {group.texts.map(t => t.text).join(' ')}
                                   </p>
