@@ -85,7 +85,11 @@ function SpeakerRing({ isActive, level = 0, thumbnail = false }) {
 
 function NetworkWarningBanner({ onDismiss }) {
   const [expanded, setExpanded] = useState(false);
-  const openNetworkSettings = () => { try { window.open('ms-settings:network-wifi', '_blank'); } catch (_) { } };
+
+  const openNetworkSettings = () => {
+    try { window.open('ms-settings:network-wifi', '_blank'); } catch (_) { }
+  };
+
   return (
     <div className="bg-amber-900/40 border-b border-amber-700/50 px-4 py-3 shrink-0">
       <div className="flex items-start justify-between gap-3">
@@ -95,7 +99,10 @@ function NetworkWarningBanner({ onDismiss }) {
             <p className="text-amber-200 text-sm font-medium">
               Your connection appears to be unstable. Other participants may not be able to see or hear you clearly.
             </p>
-            <button onClick={() => setExpanded(p => !p)} className="flex items-center gap-1 text-amber-400 text-xs mt-1 hover:text-amber-300 transition-colors">
+            <button
+              onClick={() => setExpanded(p => !p)}
+              className="flex items-center gap-1 text-amber-400 text-xs mt-1 hover:text-amber-300 transition-colors"
+            >
               {expanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
               How to fix this
             </button>
@@ -107,7 +114,10 @@ function NetworkWarningBanner({ onDismiss }) {
                 <p>③ Close bandwidth-heavy applications (downloads, streaming, backups).</p>
                 <p>④ Restart your router if other devices on the same network are also slow.</p>
                 <p>⑤ If on mobile data, move to a location with a stronger signal.</p>
-                <button onClick={openNetworkSettings} className="mt-2 px-3 py-1.5 bg-amber-700/50 hover:bg-amber-700/80 border border-amber-600/50 rounded-lg text-amber-200 transition-colors">
+                <button
+                  onClick={openNetworkSettings}
+                  className="mt-2 px-3 py-1.5 bg-amber-700/50 hover:bg-amber-700/80 border border-amber-600/50 rounded-lg text-amber-200 transition-colors"
+                >
                   Open Network Settings
                 </button>
               </div>
@@ -146,11 +156,6 @@ export default function MeetingRoom({ meetingId, user }) {
   const myRecordingStartTimeRef = useRef(null), audioLevelsRef = useRef({});
   const initSegmentRef = useRef(null);
 
-  // Tracks whether a recording upload is in progress.
-  // beforeunload uses this to warn user before they navigate away mid-upload,
-  // which would cause 0 participants in the worker (the bug we're fixing).
-  const uploadInProgressRef = useRef(false);
-
   const [networkWarning, setNetworkWarning] = useState(false);
   const networkWarningTimerRef = useRef(null);
   const lastPeerActivityRef = useRef(Date.now());
@@ -183,21 +188,6 @@ export default function MeetingRoom({ meetingId, user }) {
   const myId = (user?._id || user?.id)?.toString();
   const myName = user?.firstName ? `${user.firstName} ${user.lastName}` : 'You';
 
-  // ── Warn user if they try to navigate away while upload is in progress ─────
-  // This fires when the user closes the tab, refreshes, or navigates away.
-  // It does NOT block Next.js router.push() — that's handled separately in
-  // leaveMeeting by checking uploadInProgressRef directly.
-  useEffect(() => {
-    const handleBeforeUnload = (e) => {
-      if (uploadInProgressRef.current) {
-        e.preventDefault();
-        e.returnValue = 'Recording is still uploading. Leaving now will lose the recording. Are you sure?';
-      }
-    };
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, []);
-
   const handleAudioLevel = useCallback((id, level) => {
     audioLevelsRef.current[id] = level;
     if (id !== myId && level > 0.02) lastPeerActivityRef.current = Date.now();
@@ -208,7 +198,9 @@ export default function MeetingRoom({ meetingId, user }) {
     const interval = setInterval(() => {
       const hasPeers = Object.keys(peersRef.current).length > 0;
       if (!hasPeers) return;
-      if (Date.now() - lastPeerActivityRef.current > 15000) setNetworkWarning(true);
+      if (Date.now() - lastPeerActivityRef.current > 15000) {
+        setNetworkWarning(true);
+      }
     }, 5000);
     return () => clearInterval(interval);
   }, []);
@@ -230,7 +222,10 @@ export default function MeetingRoom({ meetingId, user }) {
   }, [participantNames, myId, myName]);
 
   const setLocalVideoRef = useCallback((el) => { localVideoRef.current = el; if (el && localStreamRef.current) el.srcObject = localStreamRef.current; }, []);
-  const broadcastMediaState = useCallback((audio, video) => { socketRef.current?.emit('media-state', { meetingId, audio, video }); }, [meetingId]);
+
+  const broadcastMediaState = useCallback((audio, video) => {
+    socketRef.current?.emit('media-state', { meetingId, audio, video });
+  }, [meetingId]);
 
   useEffect(() => {
     const onChange = () => setIsNativeFullscreen(!!document.fullscreenElement);
@@ -261,7 +256,9 @@ export default function MeetingRoom({ meetingId, user }) {
       initSegmentRef.current = null;
       recorder.ondataavailable = e => {
         if (e.data.size > 0) {
-          if (!initSegmentRef.current) initSegmentRef.current = e.data;
+          if (!initSegmentRef.current) {
+            initSegmentRef.current = e.data;
+          }
           myChunksRef.current.push(e.data);
         }
       };
@@ -270,10 +267,16 @@ export default function MeetingRoom({ meetingId, user }) {
         const chunks = [...myChunksRef.current];
         myChunksRef.current = [];
         const blobChunks = (initSegmentRef.current && chunks[0] !== initSegmentRef.current)
-          ? [initSegmentRef.current, ...chunks] : chunks;
+          ? [initSegmentRef.current, ...chunks]
+          : chunks;
         const blob = new Blob(blobChunks, { type: mimeType });
         blob.arrayBuffer().then(buf => {
-          socketRef.current?.emit('audio-chunk', { meetingId, audioChunk: buf, timestamp: Date.now(), recordingStartTime: myRecordingStartTimeRef.current });
+          socketRef.current?.emit('audio-chunk', {
+            meetingId,
+            audioChunk: buf,
+            timestamp: Date.now(),
+            recordingStartTime: myRecordingStartTimeRef.current
+          });
         }).catch(e => console.warn('Chunk send failed:', e));
       }, 10000);
       recorder.start(1000);
@@ -288,33 +291,26 @@ export default function MeetingRoom({ meetingId, user }) {
       const mimeType = myRecorderRef.current.mimeType || 'audio/webm';
       const blob = new Blob(
         (initSegmentRef.current && myChunksRef.current[0] !== initSegmentRef.current)
-          ? [initSegmentRef.current, ...myChunksRef.current] : myChunksRef.current,
+          ? [initSegmentRef.current, ...myChunksRef.current]
+          : myChunksRef.current,
         { type: mimeType }
       );
       myChunksRef.current = [];
       try {
         const buf = await blob.arrayBuffer();
         if (socketRef.current?.connected) {
-          socketRef.current.emit('audio-chunk', { meetingId, audioChunk: buf, timestamp: Date.now(), recordingStartTime: myRecordingStartTimeRef.current });
+          socketRef.current.emit('audio-chunk', {
+            meetingId,
+            audioChunk: buf,
+            timestamp: Date.now(),
+            recordingStartTime: myRecordingStartTimeRef.current
+          });
           await new Promise(r => setTimeout(r, 500));
         }
       } catch (_) { }
     }
     if (myRecorderRef.current?.state !== 'inactive') myRecorderRef.current?.stop();
     myRecorderRef.current = null; myRecordingStartTimeRef.current = null; initSegmentRef.current = null; setIsMyRecording(false);
-  }, [meetingId]);
-
-  // ── Flush this participant's audio chunks to S3 with VAD scoring ───────────
-  // MUST be called before cleanup() disconnects the socket.
-  // Every participant (host + non-hosts) calls this so the server accumulates
-  // all device audio in flushedDeviceAudio before get-transcript-queue fires.
-  const flushMyChunks = useCallback(() => {
-    return new Promise((resolve) => {
-      if (!socketRef.current?.connected) { resolve(); return; }
-      const timeout = setTimeout(() => { console.warn('flush-my-chunks timed out'); resolve(); }, 20000);
-      socketRef.current.once('my-chunks-flushed', () => { clearTimeout(timeout); resolve(); });
-      socketRef.current.emit('flush-my-chunks', { meetingId });
-    });
   }, [meetingId]);
 
   useEffect(() => {
@@ -356,7 +352,8 @@ export default function MeetingRoom({ meetingId, user }) {
           if (!mounted || !userId || userId?.toString() === myId) return;
           toast.success(`${getParticipantName(userId)} joined`); fetchParticipantNames();
           if (!peersRef.current[userId]) createPeer(userId, false, stream);
-          lastPeerActivityRef.current = Date.now(); setNetworkWarning(false);
+          lastPeerActivityRef.current = Date.now();
+          setNetworkWarning(false);
         });
 
         socketRef.current.on('user-disconnected', userId => {
@@ -392,30 +389,23 @@ export default function MeetingRoom({ meetingId, user }) {
         socketRef.current.on('recording-status', (isCurrentlyRecording) => {
           if (!mounted) return;
           setIsRecording(isCurrentlyRecording);
-          if (isCurrentlyRecording && localStreamRef.current) startMyRecording(localStreamRef.current);
+          if (isCurrentlyRecording && localStreamRef.current) {
+            startMyRecording(localStreamRef.current);
+          }
         });
 
         socketRef.current.on('recording-stopped', () => { setIsRecording(false); stopMyRecording(); });
-
-        // ── Non-host meeting-ended handler ────────────────────────────────────
-        // CRITICAL ORDER: stopMyRecording → flushMyChunks → cleanup → navigate
-        // flushMyChunks MUST complete before cleanup() disconnects the socket.
-        // Previously cleanup() ran immediately, disconnecting the socket before
-        // chunks could be uploaded — causing 0 participants in the worker.
         socketRef.current.on('meeting-ended', async () => {
           toast.success('Meeting ended by host');
           await stopMyRecording();
-          await flushMyChunks();
+          if (socketRef.current?.connected) {
+            socketRef.current.emit('flush-my-chunks', { meetingId });
+            await new Promise(r => setTimeout(r, 2000));
+          }
           cleanup();
           router.push(`/meetings/${meetingId}`);
         });
-
-        socketRef.current.on('meeting-cancelled', ({ message }) => {
-          setMeetingCancelled(true);
-          toast.error(message || 'Meeting has been cancelled by the host');
-          stopMyRecording(); cleanup();
-          setTimeout(() => router.push('/meetings/history'), 2000);
-        });
+        socketRef.current.on('meeting-cancelled', ({ message }) => { setMeetingCancelled(true); toast.error(message || 'Meeting has been cancelled by the host'); stopMyRecording(); cleanup(); setTimeout(() => router.push('/meetings/history'), 2000); });
 
         joinRoom(meetingId, myId);
         if (mounted) setIsConnecting(false);
@@ -435,16 +425,26 @@ export default function MeetingRoom({ meetingId, user }) {
     if (peersRef.current[userId]) { try { peersRef.current[userId].destroy(); } catch (_) { } delete peersRef.current[userId]; }
     const peer = new SimplePeer({ initiator, trickle: true, stream, config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }, { urls: 'turn:mainline.proxy.rlwy.net:10424', username: 'catalyst', credential: 'catalyst123' }, { urls: 'turn:mainline.proxy.rlwy.net:10424?transport=tcp', username: 'catalyst', credential: 'catalyst123' }, { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }] } });
     peer.on('signal', data => { if (!socketRef.current) return; if (data.type === 'offer') socketRef.current.emit('offer', { meetingId, offer: data, targetUserId: userId }); else if (data.type === 'answer') socketRef.current.emit('answer', { meetingId, answer: data, targetUserId: userId }); else if (data.candidate) socketRef.current.emit('ice-candidate', { meetingId, candidate: data, targetUserId: userId }); });
-    peer.on('stream', remoteStream => { setRemoteStreams(prev => ({ ...prev, [userId]: remoteStream })); lastPeerActivityRef.current = Date.now(); setNetworkWarning(false); });
+    peer.on('stream', remoteStream => {
+      setRemoteStreams(prev => ({ ...prev, [userId]: remoteStream }));
+      lastPeerActivityRef.current = Date.now();
+      setNetworkWarning(false);
+    });
     peer.on('close', () => destroyPeer(userId));
     peer.on('error', err => { console.warn(`Peer error ${userId}:`, err.message); if (err.message.includes('Connection failed') && localStreamRef.current) { setTimeout(() => { socketRef.current?.emit('peer-restart', { meetingId, targetUserId: userId }); destroyPeer(userId); createPeer(userId, true, localStreamRef.current); }, 3000); } setRemoteStreams(prev => { const n = { ...prev }; delete n[userId]; return n; }); });
+
     if (peer._pc) {
       peer._pc.onconnectionstatechange = () => {
         const state = peer._pc?.connectionState;
-        if (state === 'disconnected' || state === 'failed') setNetworkWarning(true);
-        else if (state === 'connected') { lastPeerActivityRef.current = Date.now(); setNetworkWarning(false); }
+        if (state === 'disconnected' || state === 'failed') {
+          setNetworkWarning(true);
+        } else if (state === 'connected') {
+          lastPeerActivityRef.current = Date.now();
+          setNetworkWarning(false);
+        }
       };
     }
+
     if (incomingOffer) peer.signal(incomingOffer);
     peersRef.current[userId] = peer;
   };
@@ -469,13 +469,15 @@ export default function MeetingRoom({ meetingId, user }) {
   const toggleAudio = useCallback(() => {
     const newEnabled = !isAudioEnabled;
     localStreamRef.current?.getAudioTracks().forEach(t => { t.enabled = newEnabled; });
-    setIsAudioEnabled(newEnabled); broadcastMediaState(newEnabled, isVideoEnabled);
+    setIsAudioEnabled(newEnabled);
+    broadcastMediaState(newEnabled, isVideoEnabled);
   }, [isAudioEnabled, isVideoEnabled, broadcastMediaState]);
 
   const toggleVideo = useCallback(() => {
     const newEnabled = !isVideoEnabled;
     localStreamRef.current?.getVideoTracks().forEach(t => { t.enabled = newEnabled; });
-    setIsVideoEnabled(newEnabled); broadcastMediaState(isAudioEnabled, newEnabled);
+    setIsVideoEnabled(newEnabled);
+    broadcastMediaState(isAudioEnabled, newEnabled);
   }, [isAudioEnabled, isVideoEnabled, broadcastMediaState]);
 
   const stopScreenShare = useCallback(() => {
@@ -514,98 +516,67 @@ export default function MeetingRoom({ meetingId, user }) {
       const recorder = new MediaRecorder(destination.stream, { mimeType });
       recordingChunksRef.current = [];
       recorder.ondataavailable = e => { if (e.data.size > 0) recordingChunksRef.current.push(e.data); };
-
       recorder.onstop = async () => {
         const chunks = [...recordingChunksRef.current];
         recordingChunksRef.current = [];
         const blob = new Blob(chunks, { type: 'audio/webm' });
 
-        // Mark upload in progress so beforeunload warns on tab close,
-        // and leaveMeeting blocks navigation until upload completes.
-        uploadInProgressRef.current = true;
-
         try {
-          toast.loading('Uploading recording — please wait, do not leave this page...', { id: 'upload', duration: Infinity });
+          toast.loading('Syncing per-device audio logs...', { id: 'upload' });
 
-          // Step 1: flush final partial chunk from per-device recorder
           await stopMyRecording();
-          await new Promise(r => setTimeout(r, 1000));
 
-          // Step 2: flush host's own chunks to S3 with VAD scoring
-          await flushMyChunks();
+          await new Promise(r => setTimeout(r, 2500));
 
-          // Step 3: give non-hosts 3s to flush their own chunks in parallel
-          // (non-hosts flush on the meeting-ended socket event on their side)
-          await new Promise(r => setTimeout(r, 3000));
-
-          // Step 4: collect all flushed per-device audio from server
           const perDeviceAudio = await new Promise(resolve => {
-            const timeout = setTimeout(() => { console.warn('Per-device audio sync timed out'); resolve([]); }, 15000);
-            socketRef.current?.once('transcript-queue', ({ perDeviceAudio: pda }) => { clearTimeout(timeout); resolve(pda || []); });
+            const timeout = setTimeout(() => {
+              console.warn('Per-device audio sync timed out');
+              resolve([]);
+            }, 15000);
+
+            socketRef.current?.once('transcript-queue', ({ perDeviceAudio: pda }) => {
+              clearTimeout(timeout);
+              resolve(pda || []);
+            });
+
             socketRef.current?.emit('get-transcript-queue', { meetingId });
           });
 
           const fd = new FormData();
           fd.append('recording', blob, 'meeting-recording.webm');
-          if (perDeviceAudio.length > 0) fd.append('perDeviceAudio', JSON.stringify(perDeviceAudio));
+          if (perDeviceAudio.length > 0) {
+            fd.append('perDeviceAudio', JSON.stringify(perDeviceAudio));
+          }
 
-          toast.loading('Saving to cloud...', { id: 'upload', duration: Infinity });
-          await api.post(`/meetings/${meetingId}/upload-recording`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+          toast.loading('Uploading recording...', { id: 'upload' });
+          await api.post(`/meetings/${meetingId}/upload-recording`, fd, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+          });
 
           toast.success(
-            `Recording saved! ${perDeviceAudio.length} speaker channel${perDeviceAudio.length !== 1 ? 's' : ''} synced. Go to the meeting page and click "Analyze Meeting" when ready.`,
-            { id: 'upload', duration: 8000 }
+            'Recording saved! Go to the meeting page and click "Analyze Meeting" when ready.',
+            { id: 'upload', duration: 6000 }
           );
         } catch (e) {
           console.error('Upload failed:', e);
           toast.error('Failed to upload recording. Please try manual upload in history.', { id: 'upload' });
-        } finally {
-          // Always clear the lock — unblocks leaveMeeting and beforeunload
-          uploadInProgressRef.current = false;
         }
       };
-
-      recorder.start(1000);
-      mediaRecorderRef.current = recorder;
-      socketRef.current?.emit('start-recording', { meetingId });
-      setIsRecording(true);
-      toast.success('Recording started');
+      recorder.start(1000); mediaRecorderRef.current = recorder;
+      socketRef.current?.emit('start-recording', { meetingId }); setIsRecording(true); toast.success('Recording started');
     } catch (e) { toast.error('Could not start recording: ' + e.message); }
-  }, [meetingId, remoteStreams, stopMyRecording, flushMyChunks]);
+  }, [meetingId, remoteStreams, stopMyRecording]);
 
-  // ── Stop recording (host presses Stop Rec) ────────────────────────────────
-  // Shows a persistent "please wait" toast immediately so user knows not to
-  // navigate away. The onstop handler above updates the toast as steps complete.
-  const stopRecording = useCallback(() => {
-    if (mediaRecorderRef.current?.state !== 'inactive') {
-      toast.loading('Uploading recording — please wait, do not leave this page...', { id: 'upload', duration: Infinity });
-      mediaRecorderRef.current.stop();
-    }
-    socketRef.current?.emit('stop-recording', { meetingId });
-    setIsRecording(false);
-  }, [meetingId]);
+  const stopRecording = useCallback(() => { if (mediaRecorderRef.current?.state !== 'inactive') mediaRecorderRef.current?.stop(); socketRef.current?.emit('stop-recording', { meetingId }); setIsRecording(false); toast.success('Recording stopped — uploading...'); }, [meetingId]);
+  const leaveMeeting = useCallback(() => { stopMyRecording(); cleanup(); router.push('/meetings/history'); }, [stopMyRecording]);
 
-  // ── Leave meeting (non-host Leave button) ─────────────────────────────────
-  // Blocks navigation if upload is still in progress to prevent data loss.
-  const leaveMeeting = useCallback(() => {
-    if (uploadInProgressRef.current) {
-      toast.error('Please wait — recording is still uploading. You can leave once it completes.');
-      return;
-    }
-    stopMyRecording(); cleanup(); router.push('/meetings/history');
-  }, [stopMyRecording]);
-
-  // ── End meeting (host End button) ─────────────────────────────────────────
-  // Wraps recorder.onstop in a Promise so we await the full upload pipeline
-  // before navigating. Eliminates the old 8-second hardcoded race condition.
   const handleEndMeeting = useCallback(async () => {
     if (!isHost) return;
     setIsEndingMeeting(true);
     try {
       await api.post(`/meetings/${meetingId}/end`);
-
       if (isRecording && mediaRecorderRef.current?.state !== 'inactive') {
-        toast.loading('Saving recording...', { id: 'end-meeting', duration: Infinity });
+        toast.loading('Saving recording...', { id: 'end-meeting' });
         await new Promise((resolve) => {
           const originalOnStop = mediaRecorderRef.current.onstop;
           mediaRecorderRef.current.onstop = async (e) => {
@@ -617,17 +588,9 @@ export default function MeetingRoom({ meetingId, user }) {
           setIsRecording(false);
         });
         toast.dismiss('end-meeting');
-      } else {
-        stopMyRecording();
-      }
-
-      toast.success('Meeting ended');
-      cleanup();
-      router.push(`/meetings/${meetingId}`);
-    } catch (e) {
-      toast.error(e?.response?.data?.message || 'Failed to end meeting');
-      setIsEndingMeeting(false);
-    }
+      } else { stopMyRecording(); }
+      toast.success('Meeting ended'); cleanup(); router.push(`/meetings/${meetingId}`);
+    } catch (e) { toast.error(e?.response?.data?.message || 'Failed to end meeting'); setIsEndingMeeting(false); }
   }, [isHost, isRecording, meetingId, stopMyRecording]);
 
   if (meetingCancelled) return (
@@ -691,6 +654,7 @@ export default function MeetingRoom({ meetingId, user }) {
       </header>
 
       {isRecording && !isHost && (<div className="bg-red-900/30 border-b border-red-800/50 px-4 py-2 text-center text-sm text-red-300 shrink-0">🔴 This meeting is being recorded</div>)}
+
       {networkWarning && <NetworkWarningBanner onDismiss={() => setNetworkWarning(false)} />}
 
       <div className="flex-1 min-h-0 flex overflow-hidden">
@@ -709,6 +673,7 @@ export default function MeetingRoom({ meetingId, user }) {
                 {remoteEntries.filter(([uid]) => uid !== pinnedUserId).map(([uid, st]) => (<RemoteTile key={uid} userId={uid} stream={st} name={getParticipantName(uid)} isHandRaised={raisedHands.has(uid)} isPinned={false} onPin={() => setPinnedUserId(uid)} onFullscreen={() => handleFullscreen(uid)} thumbnail isActiveSpeaker={activeSpeakerId === uid} audioLevel={ringLevels[uid] || 0} onAudioLevel={lvl => handleAudioLevel(uid, lvl)} {...remoteProps(uid)} />))}
               </div>
             </div>
+
           ) : zoomedId ? (
             <div className="flex flex-col gap-2 h-full">
               <div className="flex-[7] min-h-0">
@@ -723,6 +688,7 @@ export default function MeetingRoom({ meetingId, user }) {
                 {remoteEntries.filter(([uid]) => uid !== zoomedId).map(([uid, st]) => (<RemoteTile key={uid} userId={uid} stream={st} name={getParticipantName(uid)} isHandRaised={raisedHands.has(uid)} isPinned={false} onPin={() => setPinnedUserId(uid)} onFullscreen={() => handleFullscreen(uid)} thumbnail isActiveSpeaker={activeSpeakerId === uid} audioLevel={ringLevels[uid] || 0} onAudioLevel={lvl => handleAudioLevel(uid, lvl)} {...remoteProps(uid)} />))}
               </div>
             </div>
+
           ) : (
             <div className={cn('grid gap-2 h-full', totalParticipants === 1 ? 'grid-cols-1 grid-rows-1' : totalParticipants === 2 ? 'grid-cols-2 grid-rows-1' : totalParticipants <= 4 ? 'grid-cols-2 grid-rows-2' : totalParticipants <= 6 ? 'grid-cols-3 grid-rows-2' : totalParticipants <= 9 ? 'grid-cols-3 grid-rows-3' : 'grid-cols-4')}>
               <LocalTile videoRef={setLocalVideoRef} name={myName} isHost={isHost} isAudioEnabled={isAudioEnabled} isVideoEnabled={isVideoEnabled} isScreenSharing={isScreenSharing} isHandRaised={raisedHands.has(myId)} isPinned={pinnedUserId === 'local'} onPin={() => setPinnedUserId('local')} onFullscreen={() => handleFullscreen('local')} spanFull={totalParticipants === 3} stream={localStreamRef.current} audioEnabled={isAudioEnabled} isActiveSpeaker={activeSpeakerId === myId} audioLevel={ringLevels[myId] || 0} onAudioLevel={lvl => handleAudioLevel(myId, lvl)} />

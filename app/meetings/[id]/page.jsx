@@ -25,61 +25,6 @@ import SimilarMeetingsPanel from '@/components/meeting/SimilarMeetingsPanel';
 import MeetingSummaryPanel from '@/components/meeting/MeetingSummaryPanel';
 import toast from 'react-hot-toast';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Analyze Meeting Button with live countdown
-//
-// Shows a 60-second cooldown after the meeting ends to give background VAD
-// scoring time to finish writing real voiceRatio scores to MongoDB before
-// the worker picks up the job. Without this, the worker runs with placeholder
-// voiceRatio: 0.5 scores and falls back to the timestamp heuristic.
-//
-// The countdown ticks live every second via useEffect + setInterval.
-// When it reaches 0 the button activates automatically — no page refresh needed.
-// ─────────────────────────────────────────────────────────────────────────────
-function AnalyzeMeetingButton({ meetingId, endedAt, onSuccess }) {
-  const [remaining, setRemaining] = useState(() => {
-    const secondsSinceEnd = endedAt
-      ? Math.floor((Date.now() - new Date(endedAt).getTime()) / 1000)
-      : 999;
-    return Math.max(0, 60 - secondsSinceEnd);
-  });
-
-  useEffect(() => {
-    if (remaining <= 0) return;
-    const timer = setInterval(() => {
-      setRemaining(prev => {
-        if (prev <= 1) { clearInterval(timer); return 0; }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  const isReady = remaining === 0;
-
-  return (
-    <Button
-      onClick={async () => {
-        if (!isReady) return;
-        try {
-          toast.loading('Starting analysis...', { id: 'analyze' });
-          await api.post(`/meetings/${meetingId}/analyze`);
-          toast.success('Analysis started! Processing your meeting now.', { id: 'analyze', duration: 4000 });
-          onSuccess();
-        } catch (error) {
-          toast.error(error?.response?.data?.message || 'Failed to start analysis', { id: 'analyze' });
-        }
-      }}
-      disabled={!isReady}
-      title={!isReady ? `VAD scoring in progress — ready in ${remaining}s` : 'Analyze Meeting'}
-      className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
-    >
-      <Mic className="mr-2 h-4 w-4" />
-      {isReady ? 'Analyze Meeting' : `Analyze Meeting (${remaining}s)`}
-    </Button>
-  );
-}
-
 export default function MeetingDetailPage({ params }) {
   const router = useRouter();
   const { user } = useAuth();
@@ -511,11 +456,22 @@ export default function MeetingDetailPage({ params }) {
               <Button variant="outline" className="border-border text-foreground hover:bg-muted" onClick={() => setActiveTab('summary')}><FileText className="mr-2 h-4 w-4" />View Summary</Button>
             )}
             {meeting.status === 'completed' && meeting.recordingUrl && !isProcessing && (
-              <AnalyzeMeetingButton
-                meetingId={meeting._id}
-                endedAt={meeting.endedAt}
-                onSuccess={fetchMeeting}
-              />
+              <Button
+                onClick={async () => {
+                  try {
+                    toast.loading('Starting analysis...', { id: 'analyze' });
+                    await api.post(`/meetings/${meeting._id}/analyze`);
+                    toast.success('Analysis started! Processing your meeting now.', { id: 'analyze', duration: 4000 });
+                    fetchMeeting();
+                  } catch (error) {
+                    toast.error(error?.response?.data?.message || 'Failed to start analysis', { id: 'analyze' });
+                  }
+                }}
+                className="bg-purple-600 hover:bg-purple-700"
+              >
+                <Mic className="mr-2 h-4 w-4" />
+                Analyze Meeting
+              </Button>
             )}
             {isReady && (<Button onClick={() => router.push(`/meetings/${meeting._id}/schedule-followup`)} className="bg-blue-600 hover:bg-blue-700"><Plus className="mr-2 h-4 w-4" />Schedule Follow-up</Button>)}
           </div>
@@ -569,6 +525,7 @@ export default function MeetingDetailPage({ params }) {
                         <p className="text-xs text-muted-foreground mb-3">AI has assigned speakers. Click any name to correct it.</p>
                         <ScrollArea className="h-[400px]">
                           <div className="space-y-3 pr-2">
+                            {/* ── FIX: Group consecutive same-speaker segments into one dialogue box ── */}
                             {(() => {
                               const groups = [];
                               transcriptSegments.forEach((seg, i) => {
@@ -593,6 +550,7 @@ export default function MeetingDetailPage({ params }) {
                                           autoFocus
                                           defaultValue={group.speaker}
                                           onChange={(e) => {
+                                            // Correct all segments in this group at once
                                             group.texts.forEach(t => handleSpeakerChange(t.idx, e.target.value));
                                           }}
                                           className="text-sm bg-background border border-border rounded px-2 py-0.5 text-foreground focus:outline-none"
@@ -618,6 +576,7 @@ export default function MeetingDetailPage({ params }) {
                                     )}
                                     <span className="text-xs text-muted-foreground">{formatTime(group.startTime)}</span>
                                   </div>
+                                  {/* All sentences joined — one readable paragraph per speaker turn */}
                                   <p className="text-foreground text-sm leading-relaxed">
                                     {group.texts.map(t => t.text).join(' ')}
                                   </p>
