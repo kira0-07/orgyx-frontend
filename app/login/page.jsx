@@ -35,7 +35,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex w-full h-screen overflow-hidden text-[#1a1c1b] dark:text-slate-100 bg-[#faf9f7] dark:bg-slate-950 transition-colors duration-300">
+    <div className="min-h-screen flex w-full overflow-y-auto text-[#1a1c1b] dark:text-slate-100 bg-[#faf9f7] dark:bg-slate-950 transition-colors duration-300">
       {/* Theme Toggle Button positioned globally */}
       <div className="absolute top-6 right-6 z-50">
         <ThemeToggle />
