@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import useAuthStore from '@/store/authStore'
 import useNotificationStore from '@/store/notificationStore'
@@ -99,9 +99,10 @@ const SidebarNav = ({ onClose, pathname, sidebarCollapsed, isAdmin }) => {
 
 export default function DashboardLayout({ children }) {
   const pathname = usePathname()
+  const router = useRouter()
   const { user, logout } = useAuthStore()
   const { isAdmin } = useAuth()
-  const { notifications, unreadCount, fetchNotifications } = useNotificationStore()
+  const { notifications, unreadCount, fetchNotifications, markAsRead } = useNotificationStore()
 
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
@@ -117,6 +118,17 @@ export default function DashboardLayout({ children }) {
   }, [pathname])
 
   const latestUnread = notifications?.find(n => !n.read)
+
+  const handleLatestNotificationClick = () => {
+    if (latestUnread) {
+      markAsRead(latestUnread._id);
+      if (latestUnread.link) {
+        router.push(latestUnread.link);
+      } else {
+        router.push('/notifications');
+      }
+    }
+  }
 
   // Handle click outside to close user menu
   useEffect(() => {
@@ -225,13 +237,16 @@ export default function DashboardLayout({ children }) {
 
               {/* Latest Unread Notification preview */}
               {latestUnread && (
-                <div className="hidden lg:flex items-center gap-2 max-w-[240px] xl:max-w-sm mr-2 px-3 py-1.5 bg-muted/50 rounded-full border border-border overflow-hidden">
+                <button 
+                  onClick={handleLatestNotificationClick} 
+                  className="hidden lg:flex items-center gap-2 max-w-[240px] xl:max-w-sm mr-2 px-3 py-1.5 bg-muted/50 rounded-full border border-border overflow-hidden hover:bg-muted transition-colors text-left"
+                >
                   <span className="w-2 h-2 rounded-full bg-destructive flex-shrink-0 animate-pulse"></span>
                   <span className="text-xs truncate text-muted-foreground flex-1">
                     <span className="font-semibold text-foreground mr-1">{latestUnread.title}</span> 
                     <span className="opacity-80">— {latestUnread.message}</span>
                   </span>
-                </div>
+                </button>
               )}
 
               <Link href="/notifications" className="relative group/bell">

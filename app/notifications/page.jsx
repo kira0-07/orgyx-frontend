@@ -98,15 +98,23 @@ export default function NotificationsPage() {
   const handleNotificationClick = (notification, e) => {
     if (e.target.closest('button')) return; // Ignore button clicks
 
+    const markReadIfUnread = () => {
+      if (!notification.read) {
+        markAsRead(notification._id);
+      }
+    };
+
     if (notification.link) {
+      markReadIfUnread();
       router.push(notification.link);
       return;
     }
 
     if (notification.entityType && notification.entityId) {
+      let routed = true;
       switch (notification.entityType) {
         case 'meeting':
-          router.push(`/meetings/history`); // Generic fallback for meeting lists if ID isn't a direct route
+          router.push(`/meetings/history`);
           break;
         case 'task':
           router.push(`/tasks`);
@@ -117,16 +125,24 @@ export default function NotificationsPage() {
         case 'recommendation':
           router.push(`/recommendations`);
           break;
-        default: break;
+        default: 
+          routed = false;
+          break;
       }
-      return;
+      if (routed) {
+        markReadIfUnread();
+        return;
+      }
     }
 
     if (notification.type.includes('meeting')) {
+      markReadIfUnread();
       router.push('/meetings/history');
     } else if (notification.type.includes('task')) {
+      markReadIfUnread();
       router.push('/tasks');
     } else if (notification.type.includes('recommendation') || notification.type.includes('performance') || notification.type.includes('risk')) {
+      markReadIfUnread();
       router.push('/recommendations');
     }
   };

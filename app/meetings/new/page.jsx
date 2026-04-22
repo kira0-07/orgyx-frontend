@@ -103,19 +103,19 @@ export default function NewMeetingPage() {
 
   return (
     <>
-      <div className="h-[calc(100vh-10rem)] flex flex-col min-h-[600px]">
+      <div className="lg:h-[calc(100vh-10rem)] flex flex-col lg:min-h-[600px] min-h-screen">
         {/* Header */}
         <div className="mb-6 shrink-0 flex justify-between items-end">
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-foreground">Schedule a Meeting</h1>
             <p className="text-muted-foreground">Set up a new meeting with your team members</p>
           </div>
-          <Badge variant="outline" className="text-[10px] opacity-20 hover:opacity-100 transition-opacity">v1.2-SPLIT</Badge>
+          <Badge variant="outline" className="text-[10px] opacity-20 hover:opacity-100 transition-opacity">v1.3-FLEX</Badge>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex-1 flex flex-col lg:flex-row gap-8 min-h-0">
-          {/* Left Column (60%) - Scrollable Form Details */}
-          <div className="flex-[1.5] overflow-y-auto pr-4 space-y-6 custom-scrollbar">
+        <form onSubmit={handleSubmit} className="flex-1 flex flex-col lg:flex-row gap-8 lg:min-h-0 pb-10 lg:pb-0">
+          {/* Left Column (60%) - Scrollable Form Details on Desktop, natural flow on Mobile */}
+          <div className="flex-[1.5] lg:overflow-y-auto lg:pr-4 space-y-6 custom-scrollbar flex flex-col shrink-0 lg:shrink">
             {/* Meeting Details Card */}
             <Card className="bg-card border-border shadow-sm">
               <CardHeader className="pb-4">
@@ -254,8 +254,8 @@ export default function NewMeetingPage() {
             </Card>
           </div>
 
-          {/* Right Column (40%) - Attendees (Fixed with internal scroll) */}
-          <div className="flex-1 flex flex-col h-full min-h-0 bg-card border border-border rounded-xl shadow-sm overflow-hidden">
+          {/* Right Column (40%) - Attendees */}
+          <div className="flex-1 flex flex-col lg:h-full lg:min-h-0 min-h-[500px] bg-card border border-border rounded-xl shadow-sm overflow-hidden shrink-0 lg:shrink">
             <CardHeader className="pb-4 shrink-0">
               <CardTitle className="flex items-center gap-2 text-base">
                 <Users className="h-4 w-4 text-primary" />

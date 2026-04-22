@@ -479,38 +479,39 @@ export default function MeetingDetailPage({ params }) {
             {['ready', 'completed', 'processing'].includes(meeting.status) && (
               <Button variant="outline" className="border-border text-foreground hover:bg-muted" onClick={() => setActiveTab('summary')}><FileText className="mr-2 h-4 w-4" />View Summary</Button>
             )}
-            {/* FIX 3: Analyze Meeting button with 60-second cooldown.
-                cooldownRemaining = 0 when: endedAt is missing (999s elapsed → Math.max(0, 60-999) = 0)
-                or when 60+ real seconds have passed since endedAt. Button disabled only during cooldown. */}
-            {meeting.status === 'completed' && meeting.recordingUrl && !isProcessing && (
-              <Button
-                onClick={async () => {
-                  if (cooldownRemaining > 0) return;
-                  try {
-                    toast.loading('Starting analysis...', { id: 'analyze' });
-                    await api.post(`/meetings/${meeting._id}/analyze`);
-                    toast.success('Analysis started! Processing your meeting now.', { id: 'analyze', duration: 4000 });
-                    fetchMeeting();
-                  } catch (error) {
-                    toast.error(error?.response?.data?.message || 'Failed to start analysis', { id: 'analyze' });
-                  }
-                }}
-                disabled={cooldownRemaining > 0}
-                className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {cooldownRemaining > 0 ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Analyze in {cooldownRemaining}s
-                  </>
-                ) : (
-                  <>
-                    <Mic className="mr-2 h-4 w-4" />
+            
+            {meeting.status === 'completed' && !isProcessing && (
+              meeting.recordingUrl ? (
+                <Button
+                  onClick={async () => {
+                    try {
+                      toast.loading('Starting analysis...', { id: 'analyze' });
+                      await api.post(`/meetings/${meeting._id}/analyze`);
+                      toast.success('Analysis started! Processing your meeting now.', { id: 'analyze', duration: 4000 });
+                      fetchMeeting();
+                    } catch (error) {
+                      toast.error(error?.response?.data?.message || 'Failed to start analysis', { id: 'analyze' });
+                    }
+                  }}
+                  className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50"
+                  disabled={cooldownRemaining > 0}
+                >
+                  <Mic className="mr-2 h-4 w-4" />
+                  {cooldownRemaining > 0 ? `Analyze Meeting (${cooldownRemaining}s)` : 'Analyze Meeting'}
+                </Button>
+              ) : (
+                <div className="relative group">
+                  <Button disabled className="bg-purple-600/50 cursor-not-allowed">
+                    <Mic className="mr-2 h-4 w-4 opacity-50" />
                     Analyze Meeting
-                  </>
-                )}
-              </Button>
+                  </Button>
+                  <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-max px-3 py-1.5 bg-slate-800 text-slate-200 text-xs rounded shadow-lg pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-50">
+                    Recording missing. Upload it first to analyze.
+                  </div>
+                </div>
+              )
             )}
+
             {isReady && (<Button onClick={() => router.push(`/meetings/${meeting._id}/schedule-followup`)} className="bg-blue-600 hover:bg-blue-700"><Plus className="mr-2 h-4 w-4" />Schedule Follow-up</Button>)}
           </div>
         </div>
