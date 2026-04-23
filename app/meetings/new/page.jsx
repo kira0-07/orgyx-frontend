@@ -70,6 +70,7 @@ export default function NewMeetingPage() {
         attendees: formData.attendees.map(id => ({ user: id }))
       });
       toast.success('Meeting scheduled successfully');
+      router.refresh();
       router.push('/meetings/history');
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to schedule meeting');

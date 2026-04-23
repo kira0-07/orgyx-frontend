@@ -81,6 +81,7 @@ export default function ScheduleFollowupPage({ params }) {
         scheduledDate: new Date(data.scheduledDate).toISOString(),
       });
       toast.success('Follow-up meeting scheduled successfully');
+      router.refresh();
       router.push(`/meetings/${params.id}`);
     } catch (error) {
       console.error('Failed to schedule follow-up:', error);

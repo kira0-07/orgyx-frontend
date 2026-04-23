@@ -468,8 +468,7 @@ export default function MeetingDetailPage({ params }) {
           <div className="flex gap-2 flex-wrap">
             {isReady && (<Button variant="outline" onClick={handleExportPDF} className="border-border text-foreground hover:bg-muted"><Download className="mr-2 h-4 w-4" />Export PDF</Button>)}
             {isReady && (<Button variant="outline" onClick={handleExportDOCX} className="border-border text-foreground hover:bg-muted"><FileDown className="mr-2 h-4 w-4" />Export DOCX</Button>)}
-            {meeting.status === 'scheduled' && (<Button onClick={() => router.push(`/meetings/${meeting._id}/room`)} className="bg-green-600 hover:bg-green-700"><Mic className="mr-2 h-4 w-4" />Join Meeting</Button>)}
-            {meeting.status === 'live' && (<Button onClick={() => router.push(`/meetings/${meeting._id}/room`)} className="bg-green-600 hover:bg-green-700"><Mic className="mr-2 h-4 w-4" />Rejoin Meeting</Button>)}
+            {['scheduled', 'live'].includes(meeting.status) && (<Button onClick={() => router.push(`/meetings/${meeting._id}/room`)} className="bg-green-600 hover:bg-green-700"><Mic className="mr-2 h-4 w-4" />Join Meeting</Button>)}
             {(meeting.status === 'live' || meeting.status === 'scheduled') && isHost && (
               <Button onClick={() => setShowEndConfirm(true)} disabled={isEnding} className="bg-red-600 hover:bg-red-700">
                 {isEnding ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <StopCircle className="mr-2 h-4 w-4" />}

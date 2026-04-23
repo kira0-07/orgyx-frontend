@@ -68,7 +68,7 @@ export default function TasksPage() {
       toast.success('Task created');
       setShowModal(false);
       setForm({ title: '', description: '', assignee: '', priority: 'medium', dueDate: '' });
-      fetchTasks();
+      setTimeout(() => fetchTasks(), 300); // Give MongoDB time to index
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to create task');
     } finally {
