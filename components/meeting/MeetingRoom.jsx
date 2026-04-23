@@ -143,7 +143,7 @@ function ControlsBar({ isAudioEnabled, isVideoEnabled, isScreenSharing, isMobile
         <CtrlBtn onClick={toggleVideo} label={isVideoEnabled ? 'Stop Video' : 'Start Video'} danger={!isVideoEnabled}>{isVideoEnabled ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}</CtrlBtn>
         {!isMobile && (<CtrlBtn onClick={toggleScreenShare} label={isScreenSharing ? 'Stop Share' : 'Share'} highlight={isScreenSharing}>{isScreenSharing ? <StopCircle className="h-5 w-5" /> : <ScreenShare className="h-5 w-5" />}</CtrlBtn>)}
         <CtrlBtn onClick={toggleHand} label={isHandRaised ? 'Lower Hand' : 'Raise Hand'} warn={isHandRaised}><Hand className="h-5 w-5" /></CtrlBtn>
-        
+
         <div className="relative">
           <CtrlBtn onClick={() => setShowReactions(p => !p)} label="React"><Smile className="h-5 w-5" /></CtrlBtn>
           {showReactions && (
@@ -424,7 +424,7 @@ export default function MeetingRoom({ meetingId, user }) {
             const reactionId = Date.now() + Math.random();
             setReactions(prev => [...prev, { id: reactionId, emoji, left: Math.random() * 80 + 10 }]);
             setTimeout(() => setReactions(prev => prev.filter(r => r.id !== reactionId)), 3000);
-            return; 
+            return;
           }
 
           const senderName = userName || getParticipantName(userId);
@@ -432,11 +432,11 @@ export default function MeetingRoom({ meetingId, user }) {
           setChatOpen(prev => { if (!prev) { setUnreadCount(c => c + 1); toast(`💬 ${senderName}: ${message.substring(0, 40)}`, { duration: 3000 }); } return prev; });
         });
 
-        socketRef.current.on('hand-raised', ({ userId }) => { 
-          if (!mounted) return; 
-          setRaisedHands(prev => new Set([...prev, userId?.toString()])); 
+        socketRef.current.on('hand-raised', ({ userId }) => {
+          if (!mounted) return;
+          setRaisedHands(prev => new Set([...prev, userId?.toString()]));
           if (userId?.toString() !== myId) {
-            toast(`✋ ${getParticipantName(userId)} raised their hand`, { duration: 5000 }); 
+            toast(`✋ ${getParticipantName(userId)} raised their hand`, { duration: 5000 });
           }
         });
         socketRef.current.on('hand-lowered', ({ userId }) => { if (!mounted) return; setRaisedHands(prev => { const n = new Set(prev); n.delete(userId?.toString()); return n; }); });
@@ -602,10 +602,28 @@ export default function MeetingRoom({ meetingId, user }) {
             socketRef.current?.emit('get-transcript-queue', { meetingId, expectedParticipants });
           });
 
+          // ── FIX: Strip server-internal fields (_vadComplete, audioBuffer) before
+          // sending to the controller. Without this, JSON.stringify serializes raw
+          // Buffer objects as {"type":"Buffer","data":[...]} making the payload
+          // enormous and causing perDeviceAudio to be silently dropped on the server.
+          const cleanedPerDeviceAudio = perDeviceAudio.map(({ _vadComplete, ...device }) => ({
+            userId: device.userId,
+            userName: device.userName,
+            recordingStartTime: device.recordingStartTime,
+            audioKey: device.audioKey,
+            chunks: (device.chunks || []).map(({ audioKey, timestamp, chunkIndex, voiceRatio, hasVoice }) => ({
+              audioKey,
+              timestamp,
+              chunkIndex,
+              voiceRatio,
+              hasVoice,
+            })),
+          }));
+
           const fd = new FormData();
           fd.append('recording', blob, 'meeting-recording.webm');
-          if (perDeviceAudio.length > 0) {
-            fd.append('perDeviceAudio', JSON.stringify(perDeviceAudio));
+          if (cleanedPerDeviceAudio.length > 0) {
+            fd.append('perDeviceAudio', JSON.stringify(cleanedPerDeviceAudio));
           }
 
           toast.loading('Uploading recording...', { id: 'upload' });
@@ -708,7 +726,7 @@ export default function MeetingRoom({ meetingId, user }) {
           z-index: 9999;
         }
       `}</style>
-      
+
       {reactions.map(r => (
         <div key={r.id} className="emoji-float" style={{ left: `${r.left}%` }}>{r.emoji}</div>
       ))}
@@ -825,7 +843,7 @@ export default function MeetingRoom({ meetingId, user }) {
           </div>
         )}
       </div>
-      
+
       {!fullscreenUserId && <ControlsBar {...controlsProps} />}
     </div>
   );
