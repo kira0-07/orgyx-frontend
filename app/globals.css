@@ -3,6 +3,9 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    scroll-behavior: smooth;
+  }
   :root {
     /* Stitch MCP: "The Kinetic Void" Dark Mode Base */
     --background: 230 20% 4%;
