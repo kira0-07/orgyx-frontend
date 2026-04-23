@@ -682,6 +682,16 @@ export default function MeetingRoom({ meetingId, user }) {
   const controlsProps = { isAudioEnabled, isVideoEnabled, isScreenSharing, isMobile, isHandRaised, isRecording, isHost, isEndingMeeting, toggleAudio, toggleVideo, toggleScreenShare, toggleHand, startRecording, stopRecording, handleEndMeeting, leaveMeeting, triggerReaction: triggerReactionEvent };
   const remoteProps = (uid) => ({ isMuted: participantMediaState[uid]?.audio === false, isCameraOff: participantMediaState[uid]?.video === false });
 
+  const getGridClasses = (count) => {
+    if (count === 1) return 'w-full max-w-6xl';
+    if (count === 2) return 'w-full md:w-[48%] max-w-4xl';
+    if (count <= 4) return 'w-[48%] max-w-2xl';
+    if (count <= 6) return 'w-[32%] max-w-xl';
+    if (count <= 9) return 'w-[32%] max-w-lg';
+    return 'w-[24%] max-w-md';
+  };
+  const tileWidthClass = getGridClasses(totalParticipants);
+
   return (
     <div className="h-screen bg-background text-foreground flex flex-col overflow-hidden relative">
       <style>{`
@@ -744,41 +754,53 @@ export default function MeetingRoom({ meetingId, user }) {
       )}
 
       <div className="flex-1 min-h-0 flex overflow-hidden relative">
-        <div className={cn('flex-1 min-w-0 p-3 overflow-hidden transition-all duration-200 h-full', chatOpen && 'md:mr-80')}>
+        <div className={cn('flex-1 min-w-0 overflow-hidden transition-all duration-200 h-full flex flex-col', chatOpen && 'md:mr-80')}>
           {pinnedUserId ? (
-            <div className="flex flex-col gap-3 h-full">
-              <div className="flex-1 min-h-0">
-                {pinnedUserId === 'local' ? (
-                  <LocalTile videoRef={setLocalVideoRef} name={myName} isHost={isHost} isAudioEnabled={isAudioEnabled} isVideoEnabled={isVideoEnabled} isScreenSharing={isScreenSharing} isHandRaised={raisedHands.has(myId)} isPinned onPin={() => setPinnedUserId(null)} onFullscreen={() => handleFullscreen('local')} large stream={localStreamRef.current} audioEnabled={isAudioEnabled} isActiveSpeaker={activeSpeakerId === myId} audioLevel={ringLevels[myId] || 0} onAudioLevel={lvl => handleAudioLevel(myId, lvl)} />
-                ) : (
-                  <RemoteTile userId={pinnedUserId} stream={remoteStreams[pinnedUserId]} name={getParticipantName(pinnedUserId)} isHandRaised={raisedHands.has(pinnedUserId)} isPinned onPin={() => setPinnedUserId(null)} onFullscreen={() => handleFullscreen(pinnedUserId)} large isActiveSpeaker={activeSpeakerId === pinnedUserId} audioLevel={ringLevels[pinnedUserId] || 0} onAudioLevel={lvl => handleAudioLevel(pinnedUserId, lvl)} {...remoteProps(pinnedUserId)} />
-                )}
+            <div className="flex flex-col gap-2 h-full p-2">
+              <div className="flex-1 min-h-0 flex items-center justify-center">
+                <div className="w-full h-full max-w-6xl flex items-center justify-center">
+                  {pinnedUserId === 'local' ? (
+                    <LocalTile videoRef={setLocalVideoRef} name={myName} isHost={isHost} isAudioEnabled={isAudioEnabled} isVideoEnabled={isVideoEnabled} isScreenSharing={isScreenSharing} isHandRaised={raisedHands.has(myId)} isPinned onPin={() => setPinnedUserId(null)} onFullscreen={() => handleFullscreen('local')} large stream={localStreamRef.current} audioEnabled={isAudioEnabled} isActiveSpeaker={activeSpeakerId === myId} audioLevel={ringLevels[myId] || 0} onAudioLevel={lvl => handleAudioLevel(myId, lvl)} />
+                  ) : (
+                    <RemoteTile userId={pinnedUserId} stream={remoteStreams[pinnedUserId]} name={getParticipantName(pinnedUserId)} isHandRaised={raisedHands.has(pinnedUserId)} isPinned onPin={() => setPinnedUserId(null)} onFullscreen={() => handleFullscreen(pinnedUserId)} large isActiveSpeaker={activeSpeakerId === pinnedUserId} audioLevel={ringLevels[pinnedUserId] || 0} onAudioLevel={lvl => handleAudioLevel(pinnedUserId, lvl)} {...remoteProps(pinnedUserId)} />
+                  )}
+                </div>
               </div>
-              <div className="flex gap-2 h-28 shrink-0 overflow-x-auto">
+              <div className="h-32 shrink-0 flex gap-2 overflow-x-auto overflow-y-hidden pb-2 justify-center">
                 {pinnedUserId !== 'local' && (<LocalTile videoRef={setLocalVideoRef} name="You" isHost={isHost} isAudioEnabled={isAudioEnabled} isVideoEnabled={isVideoEnabled} isScreenSharing={isScreenSharing} isHandRaised={raisedHands.has(myId)} isPinned={false} onPin={() => setPinnedUserId('local')} onFullscreen={() => handleFullscreen('local')} thumbnail stream={localStreamRef.current} audioEnabled={isAudioEnabled} isActiveSpeaker={activeSpeakerId === myId} audioLevel={ringLevels[myId] || 0} onAudioLevel={lvl => handleAudioLevel(myId, lvl)} />)}
                 {remoteEntries.filter(([uid]) => uid !== pinnedUserId).map(([uid, st]) => (<RemoteTile key={uid} userId={uid} stream={st} name={getParticipantName(uid)} isHandRaised={raisedHands.has(uid)} isPinned={false} onPin={() => setPinnedUserId(uid)} onFullscreen={() => handleFullscreen(uid)} thumbnail isActiveSpeaker={activeSpeakerId === uid} audioLevel={ringLevels[uid] || 0} onAudioLevel={lvl => handleAudioLevel(uid, lvl)} {...remoteProps(uid)} />))}
               </div>
             </div>
 
           ) : zoomedId ? (
-            <div className="flex flex-col gap-2 h-full">
-              <div className="flex-[7] min-h-0">
-                {zoomedId === myId ? (
-                  <LocalTile videoRef={setLocalVideoRef} name={myName} isHost={isHost} isAudioEnabled={isAudioEnabled} isVideoEnabled={isVideoEnabled} isScreenSharing={isScreenSharing} isHandRaised={raisedHands.has(myId)} isPinned={false} onPin={() => setPinnedUserId('local')} onFullscreen={() => handleFullscreen('local')} large stream={localStreamRef.current} audioEnabled={isAudioEnabled} isActiveSpeaker audioLevel={ringLevels[myId] || 0} onAudioLevel={lvl => handleAudioLevel(myId, lvl)} />
-                ) : (
-                  <RemoteTile userId={zoomedId} stream={remoteStreams[zoomedId]} name={getParticipantName(zoomedId)} isHandRaised={raisedHands.has(zoomedId)} isPinned={false} onPin={() => setPinnedUserId(zoomedId)} onFullscreen={() => handleFullscreen(zoomedId)} large isActiveSpeaker audioLevel={ringLevels[zoomedId] || 0} onAudioLevel={lvl => handleAudioLevel(zoomedId, lvl)} {...remoteProps(zoomedId)} />
-                )}
+            <div className="flex flex-col gap-2 h-full p-2">
+              <div className="flex-1 min-h-0 flex items-center justify-center">
+                <div className="w-full h-full max-w-6xl flex items-center justify-center">
+                  {zoomedId === myId ? (
+                    <LocalTile videoRef={setLocalVideoRef} name={myName} isHost={isHost} isAudioEnabled={isAudioEnabled} isVideoEnabled={isVideoEnabled} isScreenSharing={isScreenSharing} isHandRaised={raisedHands.has(myId)} isPinned={false} onPin={() => setPinnedUserId('local')} onFullscreen={() => handleFullscreen('local')} large stream={localStreamRef.current} audioEnabled={isAudioEnabled} isActiveSpeaker audioLevel={ringLevels[myId] || 0} onAudioLevel={lvl => handleAudioLevel(myId, lvl)} />
+                  ) : (
+                    <RemoteTile userId={zoomedId} stream={remoteStreams[zoomedId]} name={getParticipantName(zoomedId)} isHandRaised={raisedHands.has(zoomedId)} isPinned={false} onPin={() => setPinnedUserId(zoomedId)} onFullscreen={() => handleFullscreen(zoomedId)} large isActiveSpeaker audioLevel={ringLevels[zoomedId] || 0} onAudioLevel={lvl => handleAudioLevel(zoomedId, lvl)} {...remoteProps(zoomedId)} />
+                  )}
+                </div>
               </div>
-              <div className="flex-[3] min-h-0 flex gap-2 overflow-x-auto pb-1">
+              <div className="h-32 shrink-0 flex gap-2 overflow-x-auto overflow-y-hidden pb-2 justify-center">
                 {zoomedId !== myId && (<LocalTile videoRef={setLocalVideoRef} name="You" isHost={isHost} isAudioEnabled={isAudioEnabled} isVideoEnabled={isVideoEnabled} isScreenSharing={isScreenSharing} isHandRaised={raisedHands.has(myId)} isPinned={false} onPin={() => setPinnedUserId('local')} onFullscreen={() => handleFullscreen('local')} thumbnail stream={localStreamRef.current} audioEnabled={isAudioEnabled} isActiveSpeaker={activeSpeakerId === myId} audioLevel={ringLevels[myId] || 0} onAudioLevel={lvl => handleAudioLevel(myId, lvl)} />)}
                 {remoteEntries.filter(([uid]) => uid !== zoomedId).map(([uid, st]) => (<RemoteTile key={uid} userId={uid} stream={st} name={getParticipantName(uid)} isHandRaised={raisedHands.has(uid)} isPinned={false} onPin={() => setPinnedUserId(uid)} onFullscreen={() => handleFullscreen(uid)} thumbnail isActiveSpeaker={activeSpeakerId === uid} audioLevel={ringLevels[uid] || 0} onAudioLevel={lvl => handleAudioLevel(uid, lvl)} {...remoteProps(uid)} />))}
               </div>
             </div>
 
           ) : (
-            <div className={cn('grid gap-2 h-full', totalParticipants === 1 ? 'grid-cols-1 grid-rows-1' : totalParticipants === 2 ? 'grid-cols-2 grid-rows-1' : totalParticipants <= 4 ? 'grid-cols-2 grid-rows-2' : totalParticipants <= 6 ? 'grid-cols-3 grid-rows-2' : totalParticipants <= 9 ? 'grid-cols-3 grid-rows-3' : 'grid-cols-4')}>
-              <LocalTile videoRef={setLocalVideoRef} name={myName} isHost={isHost} isAudioEnabled={isAudioEnabled} isVideoEnabled={isVideoEnabled} isScreenSharing={isScreenSharing} isHandRaised={raisedHands.has(myId)} isPinned={pinnedUserId === 'local'} onPin={() => setPinnedUserId('local')} onFullscreen={() => handleFullscreen('local')} spanFull={totalParticipants === 3} stream={localStreamRef.current} audioEnabled={isAudioEnabled} isActiveSpeaker={activeSpeakerId === myId} audioLevel={ringLevels[myId] || 0} onAudioLevel={lvl => handleAudioLevel(myId, lvl)} />
-              {remoteEntries.map(([uid, st]) => (<RemoteTile key={uid} userId={uid} stream={st} name={getParticipantName(uid)} isHandRaised={raisedHands.has(uid)} isPinned={pinnedUserId === uid} onPin={() => setPinnedUserId(p => p === uid ? null : uid)} onFullscreen={() => handleFullscreen(uid)} isActiveSpeaker={activeSpeakerId === uid} audioLevel={ringLevels[uid] || 0} onAudioLevel={lvl => handleAudioLevel(uid, lvl)} {...remoteProps(uid)} />))}
+            <div className="flex-1 overflow-y-auto p-2">
+              <div className="flex flex-wrap items-center justify-center content-center gap-3 h-full w-full">
+                <div className={cn("transition-all duration-300", tileWidthClass)}>
+                  <LocalTile videoRef={setLocalVideoRef} name={myName} isHost={isHost} isAudioEnabled={isAudioEnabled} isVideoEnabled={isVideoEnabled} isScreenSharing={isScreenSharing} isHandRaised={raisedHands.has(myId)} isPinned={pinnedUserId === 'local'} onPin={() => setPinnedUserId('local')} onFullscreen={() => handleFullscreen('local')} gallery stream={localStreamRef.current} audioEnabled={isAudioEnabled} isActiveSpeaker={activeSpeakerId === myId} audioLevel={ringLevels[myId] || 0} onAudioLevel={lvl => handleAudioLevel(myId, lvl)} />
+                </div>
+                {remoteEntries.map(([uid, st]) => (
+                  <div key={uid} className={cn("transition-all duration-300", tileWidthClass)}>
+                    <RemoteTile userId={uid} stream={st} name={getParticipantName(uid)} isHandRaised={raisedHands.has(uid)} isPinned={pinnedUserId === uid} onPin={() => setPinnedUserId(p => p === uid ? null : uid)} onFullscreen={() => handleFullscreen(uid)} gallery isActiveSpeaker={activeSpeakerId === uid} audioLevel={ringLevels[uid] || 0} onAudioLevel={lvl => handleAudioLevel(uid, lvl)} {...remoteProps(uid)} />
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
@@ -809,10 +831,10 @@ export default function MeetingRoom({ meetingId, user }) {
   );
 }
 
-function LocalTile({ videoRef, name, isHost, isAudioEnabled, isVideoEnabled, isScreenSharing, isHandRaised, isPinned, onPin, onFullscreen, large, thumbnail, isFullscreen, spanFull, stream, isActiveSpeaker, onAudioLevel, audioEnabled, audioLevel }) {
+function LocalTile({ videoRef, name, isHost, isAudioEnabled, isVideoEnabled, isScreenSharing, isHandRaised, isPinned, onPin, onFullscreen, large, thumbnail, isFullscreen, gallery, stream, isActiveSpeaker, onAudioLevel, audioEnabled, audioLevel }) {
   useAudioLevel(stream, audioEnabled !== false, onAudioLevel);
   return (
-    <div className={cn('relative bg-slate-900 border border-border/50 rounded-xl overflow-hidden group', large ? 'w-full h-full' : thumbnail ? 'w-40 h-28 shrink-0' : 'w-full h-full', spanFull && 'col-span-2')}>
+    <div className={cn('relative bg-slate-900 border border-border/50 rounded-xl overflow-hidden shadow-lg group', large ? 'w-full aspect-video' : thumbnail ? 'w-40 aspect-video shrink-0' : gallery ? 'w-full aspect-video' : 'w-full aspect-video')}>
       <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover" />
       {!isVideoEnabled && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-muted/80 gap-2">
@@ -834,21 +856,20 @@ function LocalTile({ videoRef, name, isHost, isAudioEnabled, isVideoEnabled, isS
   );
 }
 
-function RemoteTile({ userId, stream, name, isHandRaised, isPinned, onPin, onFullscreen, large, thumbnail, isFullscreen, spanFull, isActiveSpeaker, onAudioLevel, audioLevel, isMuted, isCameraOff }) {
+function RemoteTile({ userId, stream, name, isMuted, isCameraOff, isHandRaised, isPinned, onPin, onFullscreen, large, thumbnail, isFullscreen, gallery, isActiveSpeaker, onAudioLevel, audioLevel }) {
   const videoRef = useRef(null);
-  const [hasVideo, setHasVideo] = useState(false);
-  useAudioLevel(stream, true, onAudioLevel);
+  const [hasVideo, setHasVideo] = useState(true);
+
   useEffect(() => {
-    if (!videoRef.current || !stream) return;
-    videoRef.current.srcObject = stream;
-    const check = () => { const vt = stream.getVideoTracks(); setHasVideo(vt.length > 0 && vt[0].readyState === 'live'); };
-    check(); stream.addEventListener('addtrack', check);
-    return () => stream.removeEventListener('addtrack', check);
+    if (videoRef.current && stream) { videoRef.current.srcObject = stream; const videoTrack = stream.getVideoTracks()[0]; setHasVideo(!!videoTrack && videoTrack.enabled); }
   }, [stream]);
+
+  useAudioLevel(stream, !isMuted, onAudioLevel);
+
   const initials = name.split(' ').map(n => n[0] || '').join('').slice(0, 2).toUpperCase() || '??';
   const showCameraOff = isCameraOff || !hasVideo;
   return (
-    <div className={cn('relative bg-slate-900 border border-border/50 rounded-xl overflow-hidden group', large ? 'w-full h-full' : thumbnail ? 'w-40 h-28 shrink-0' : 'w-full h-full', spanFull && 'col-span-2')}>
+    <div className={cn('relative bg-slate-900 border border-border/50 rounded-xl overflow-hidden shadow-lg group', large ? 'w-full aspect-video' : thumbnail ? 'w-40 aspect-video shrink-0' : gallery ? 'w-full aspect-video' : 'w-full aspect-video')}>
       <video ref={videoRef} autoPlay playsInline className={cn('w-full h-full object-cover', showCameraOff && 'hidden')} />
       {showCameraOff && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-muted/80 gap-2">
