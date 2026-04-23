@@ -23,7 +23,10 @@ export default function ClientLayoutWrapper({ children }) {
   // but DashboardLayout has headers and sidebars. Let's check what it should be.
   // Wait, MeetingRoom has fixed inset-0 z-[100] so it will overlay everything anyway!
   
-  if (NO_DASHBOARD_ROUTES.includes(pathname)) {
+  // Check if pathname is a meeting room route
+  const isMeetingRoom = pathname?.match(/^\/meetings\/[^/]+\/room$/);
+  
+  if (NO_DASHBOARD_ROUTES.includes(pathname) || isMeetingRoom) {
     return <>{children}</>;
   }
 

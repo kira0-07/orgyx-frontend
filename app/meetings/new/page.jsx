@@ -28,6 +28,7 @@ export default function NewMeetingPage() {
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [users, setUsers] = useState([]);
+  const [isFetchingUsers, setIsFetchingUsers] = useState(true);
   const [searchUsers, setSearchUsers] = useState('');
   const [formData, setFormData] = useState({
     name: '',
@@ -45,6 +46,7 @@ export default function NewMeetingPage() {
   }, []);
 
   const fetchOrgTreeUsers = async () => {
+    setIsFetchingUsers(true);
     try {
       const response = await api.get('/users?limit=100');
       const allUsers = response.data.users || [];
@@ -53,6 +55,8 @@ export default function NewMeetingPage() {
     } catch (error) {
       console.error('Failed to fetch users:', error);
       toast.error('Failed to load team members');
+    } finally {
+      setIsFetchingUsers(false);
     }
   };
 
@@ -313,7 +317,12 @@ export default function NewMeetingPage() {
 
               {/* User list - Scrollable part of the right column */}
               <div className="flex-1 overflow-y-auto space-y-1 mb-6 custom-scrollbar pr-2">
-                {filteredUsers.length === 0 ? (
+                {isFetchingUsers ? (
+                  <div className="flex flex-col items-center justify-center py-8 opacity-50">
+                    <Loader2 className="h-6 w-6 animate-spin text-primary mb-2" />
+                    <p className="text-sm text-muted-foreground">Loading team members...</p>
+                  </div>
+                ) : filteredUsers.length === 0 ? (
                   <p className="text-muted-foreground text-sm text-center py-8 bg-muted/20 rounded-lg">No team members found</p>
                 ) : (
                   filteredUsers.map((u) => {

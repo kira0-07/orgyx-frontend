@@ -137,17 +137,17 @@ function ControlsBar({ isAudioEnabled, isVideoEnabled, isScreenSharing, isMobile
   const [showReactions, setShowReactions] = useState(false);
 
   return (
-    <div className="bg-background/95 backdrop-blur border-t border-border px-4 py-3 shrink-0 relative z-50">
-      <div className="flex items-center justify-center gap-2 flex-wrap relative">
-        <CtrlBtn onClick={toggleAudio} label={isAudioEnabled ? 'Mute' : 'Unmute'} danger={!isAudioEnabled}>{isAudioEnabled ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}</CtrlBtn>
-        <CtrlBtn onClick={toggleVideo} label={isVideoEnabled ? 'Stop Video' : 'Start Video'} danger={!isVideoEnabled}>{isVideoEnabled ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}</CtrlBtn>
-        {!isMobile && (<CtrlBtn onClick={toggleScreenShare} label={isScreenSharing ? 'Stop Share' : 'Share'} highlight={isScreenSharing}>{isScreenSharing ? <StopCircle className="h-5 w-5" /> : <ScreenShare className="h-5 w-5" />}</CtrlBtn>)}
-        <CtrlBtn onClick={toggleHand} label={isHandRaised ? 'Lower Hand' : 'Raise Hand'} warn={isHandRaised}><Hand className="h-5 w-5" /></CtrlBtn>
+    <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 pointer-events-auto">
+      <div className="flex items-center gap-3 px-6 py-3 rounded-2xl bg-[#202124]/80 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.4)] border border-white/5">
+        <CtrlBtn onClick={toggleAudio} label={isAudioEnabled ? 'Turn off microphone' : 'Turn on microphone'} danger={!isAudioEnabled}>{isAudioEnabled ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}</CtrlBtn>
+        <CtrlBtn onClick={toggleVideo} label={isVideoEnabled ? 'Turn off camera' : 'Turn on camera'} danger={!isVideoEnabled}>{isVideoEnabled ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}</CtrlBtn>
+        {!isMobile && (<CtrlBtn onClick={toggleScreenShare} label={isScreenSharing ? 'Stop presenting' : 'Present now'} highlight={isScreenSharing}>{isScreenSharing ? <StopCircle className="h-5 w-5" /> : <ScreenShare className="h-5 w-5" />}</CtrlBtn>)}
+        <CtrlBtn onClick={toggleHand} label={isHandRaised ? 'Lower hand' : 'Raise hand'} warn={isHandRaised}><Hand className="h-5 w-5" /></CtrlBtn>
 
         <div className="relative">
-          <CtrlBtn onClick={() => setShowReactions(p => !p)} label="React"><Smile className="h-5 w-5" /></CtrlBtn>
+          <CtrlBtn onClick={() => setShowReactions(p => !p)} label="Send a reaction"><Smile className="h-5 w-5" /></CtrlBtn>
           {showReactions && (
-            <div className="absolute bottom-[110%] left-1/2 -translate-x-1/2 flex gap-2 bg-popover border border-border p-2 rounded-xl shadow-lg mb-2">
+            <div className="absolute bottom-[110%] left-1/2 -translate-x-1/2 flex gap-2 bg-[#2D2E30] border border-[#3C4043] p-2 rounded-xl shadow-xl mb-2">
               {['👍', '❤️', '😂', '🎉', '👏'].map(emoji => (
                 <button
                   key={emoji}
@@ -161,15 +161,24 @@ function ControlsBar({ isAudioEnabled, isVideoEnabled, isScreenSharing, isMobile
           )}
         </div>
 
-        {isHost && (<CtrlBtn onClick={isRecording ? stopRecording : startRecording} label={isRecording ? 'Stop Rec' : 'Record'} danger={isRecording}><Circle className={cn('h-5 w-5', isRecording && 'fill-current')} /></CtrlBtn>)}
-        {isHost && (<div className="flex flex-col items-center gap-1"><button onClick={handleEndMeeting} disabled={isEndingMeeting} className="h-12 w-12 rounded-full bg-red-700 hover:bg-red-800 disabled:opacity-50 flex items-center justify-center transition-colors"><StopCircle className="h-5 w-5 text-white" /></button><span className="text-xs text-muted-foreground font-medium">End</span></div>)}
-        <div className="flex flex-col items-center gap-1"><button onClick={leaveMeeting} className="h-12 w-12 rounded-full bg-red-600 hover:bg-red-700 flex items-center justify-center transition-colors"><Phone className="h-5 w-5 text-white rotate-[135deg]" /></button><span className="text-xs text-muted-foreground font-medium">Leave</span></div>
+        {isHost && (<CtrlBtn onClick={isRecording ? stopRecording : startRecording} label={isRecording ? 'Stop recording' : 'Record meeting'} danger={isRecording}><Circle className={cn('h-5 w-5', isRecording && 'fill-current')} /></CtrlBtn>)}
+        
+        <div className="w-px h-8 bg-white/10 mx-2" />
+        
+        {isHost && (
+          <button onClick={handleEndMeeting} disabled={isEndingMeeting} className="h-14 px-6 rounded-full bg-red-700 hover:bg-red-800 disabled:opacity-50 flex items-center justify-center transition-colors text-white font-medium shadow-sm" title="End Meeting for All">
+            <StopCircle className="h-5 w-5 mr-2" /> End
+          </button>
+        )}
+        <button onClick={leaveMeeting} className="h-14 px-6 rounded-full bg-[#EA4335] hover:bg-[#D93025] flex items-center justify-center transition-colors text-white font-medium shadow-sm" title="Leave Meeting">
+          <Phone className="h-5 w-5 rotate-[135deg] mr-2" /> Leave
+        </button>
       </div>
     </div>
   );
 }
 
-export default function MeetingRoom({ meetingId, user }) {
+export default function MeetingRoom({ meetingId, user, meetingName }) {
   const router = useRouter();
   const socketRef = useRef(null), localVideoRef = useRef(null), localStreamRef = useRef(null), peersRef = useRef({});
   const mediaRecorderRef = useRef(null), myRecorderRef = useRef(null), recordingChunksRef = useRef([]);
@@ -711,7 +720,7 @@ export default function MeetingRoom({ meetingId, user }) {
   const tileWidthClass = getGridClasses(totalParticipants);
 
   return (
-    <div className="h-screen bg-background text-foreground flex flex-col overflow-hidden relative">
+    <div className="h-screen bg-[#0D0E17] text-foreground flex flex-col overflow-hidden relative">
       <style>{`
         @keyframes float-up {
           0% { transform: translateY(0) scale(0.8); opacity: 1; }
@@ -744,21 +753,18 @@ export default function MeetingRoom({ meetingId, user }) {
         </div>
       )}
 
-      <header className="bg-background border-b border-border px-4 py-3 flex items-center justify-between shrink-0 z-40 relative">
-        <div className="flex items-center gap-3">
-          <h1 className="font-semibold text-foreground">Meeting Room</h1>
-          {isRecording && (<Badge className="bg-red-500/20 text-red-500 flex items-center gap-1.5 animate-pulse"><Circle className="h-2 w-2 fill-red-500" /> Recording</Badge>)}
-          {raisedHands.size > 0 && (<Badge className="bg-yellow-500/20 text-yellow-500">✋ {raisedHands.size}</Badge>)}
-          {networkWarning && (<Badge className="bg-amber-500/20 text-amber-500 flex items-center gap-1.5"><WifiOff className="h-3 w-3" /> Unstable</Badge>)}
+      <header className="absolute top-0 left-0 right-0 px-6 py-4 flex items-center justify-between shrink-0 z-40 bg-gradient-to-b from-black/60 to-transparent pointer-events-none">
+        <div className="flex items-center gap-3 pointer-events-auto">
+          <h1 className="font-medium text-white/90 text-sm tracking-wide">{meetingName || 'Meeting Room'}</h1>
+          {isRecording && (<Badge className="bg-red-500/20 text-red-400 border border-red-500/30 flex items-center gap-1.5 animate-pulse rounded-md px-2 py-0.5"><Circle className="h-2 w-2 fill-red-500" /> REC</Badge>)}
+          {raisedHands.size > 0 && (<Badge className="bg-[#F9AB00]/20 text-[#F9AB00] border border-[#F9AB00]/30 rounded-md px-2 py-0.5">✋ {raisedHands.size}</Badge>)}
+          {networkWarning && (<Badge className="bg-amber-500/20 text-amber-500 border border-amber-500/30 flex items-center gap-1.5 rounded-md px-2 py-0.5"><WifiOff className="h-3 w-3" /> Unstable</Badge>)}
         </div>
-        <div className="flex items-center gap-3">
-          <button onClick={toggleTheme} className="p-2 rounded-lg text-muted-foreground hover:bg-muted transition-colors">
-            {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-          </button>
-          <div className="flex items-center gap-1.5 text-muted-foreground text-sm"><Users className="h-4 w-4" /><span>{totalParticipants}</span></div>
-          <button onClick={() => setChatOpen(p => !p)} className={cn('relative p-2 rounded-lg transition-colors', chatOpen ? 'bg-primary/20 text-primary' : 'text-muted-foreground hover:bg-muted')}>
+        <div className="flex items-center gap-4 pointer-events-auto">
+          <div className="flex items-center gap-1.5 text-white/80 text-sm font-medium bg-black/20 px-3 py-1.5 rounded-full backdrop-blur-md border border-white/5"><Users className="h-4 w-4" /><span>{totalParticipants}</span></div>
+          <button onClick={() => setChatOpen(p => !p)} className={cn('relative p-2.5 rounded-full transition-colors backdrop-blur-md border border-white/5', chatOpen ? 'bg-[#00E676]/20 text-[#00E676]' : 'bg-black/20 text-white/80 hover:bg-black/40')}>
             <MessageSquare className="h-5 w-5" />
-            {unreadCount > 0 && (<span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-4 h-4 rounded-full flex items-center justify-center font-bold">{unreadCount > 9 ? '9+' : unreadCount}</span>)}
+            {unreadCount > 0 && (<span className="absolute top-0 right-0 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold shadow-sm transform translate-x-1/4 -translate-y-1/4">{unreadCount > 9 ? '9+' : unreadCount}</span>)}
           </button>
         </div>
       </header>
@@ -824,21 +830,32 @@ export default function MeetingRoom({ meetingId, user }) {
         </div>
 
         {chatOpen && (
-          <div className="w-80 bg-background border-l border-border flex flex-col shrink-0 absolute md:static right-0 top-0 bottom-0 z-40 shadow-xl md:shadow-none">
-            <div className="p-4 border-b border-border flex items-center justify-between shrink-0"><span className="font-semibold text-foreground">Chat</span><button onClick={() => setChatOpen(false)} className="text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button></div>
-            <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
-              {messages.length === 0 ? (<p className="text-muted-foreground text-center text-sm mt-12">No messages yet 👋</p>) : messages.map(msg => (
-                <div key={msg.id} className={cn('flex flex-col gap-0.5', msg.isOwn ? 'items-end' : 'items-start')}>
-                  <span className="text-xs text-muted-foreground px-1">{msg.userName}</span>
-                  <span className={cn('inline-block px-3 py-2 rounded-2xl text-sm max-w-[220px] break-words shadow-sm', msg.isOwn ? 'bg-primary text-primary-foreground rounded-br-sm' : 'bg-muted text-foreground rounded-bl-sm')}>{msg.message}</span>
-                  <span className="text-xs text-muted-foreground/70 px-1">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                </div>
-              ))}
+          <div className="w-full md:w-[380px] glass-panel border-l border-white/5 flex flex-col shrink-0 absolute md:static right-0 top-0 bottom-0 z-40 shadow-2xl animate-chat-slide-in">
+            <div className="p-5 border-b border-white/5 flex items-center justify-between shrink-0"><span className="font-semibold text-white tracking-wide">In-call messages</span><button onClick={() => setChatOpen(false)} className="text-white/60 hover:text-white transition-colors bg-white/5 hover:bg-white/10 p-1.5 rounded-full"><X className="h-4 w-4" /></button></div>
+            <div className="flex-1 min-h-0 overflow-y-auto p-5 space-y-4">
+              <div className="text-center p-4 bg-[#282933]/50 rounded-xl mb-4 border border-white/5">
+                <p className="text-white/60 text-xs leading-relaxed">Messages can only be seen by people in the call and are deleted when the call ends.</p>
+              </div>
+              {messages.length === 0 ? null : messages.map((msg, idx) => {
+                const prevMsg = messages[idx - 1];
+                const showHeader = !prevMsg || prevMsg.userId !== msg.userId || (new Date(msg.timestamp) - new Date(prevMsg.timestamp) > 60000);
+                return (
+                  <div key={msg.id} className={cn('flex flex-col gap-1 animate-msg-fade-in', msg.isOwn ? 'items-end' : 'items-start')}>
+                    {showHeader && (
+                      <div className="flex items-baseline gap-2 px-1 mt-2">
+                        <span className="text-[13px] font-medium text-white/80">{msg.isOwn ? 'You' : msg.userName}</span>
+                        <span className="text-[10px] text-white/40 font-medium tracking-wider">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                      </div>
+                    )}
+                    <span className={cn('inline-block px-4 py-2 text-[14px] max-w-[280px] break-words shadow-sm leading-relaxed', msg.isOwn ? 'bg-[#00E676] text-black font-medium rounded-2xl rounded-tr-sm' : 'bg-[#282933] text-white/90 rounded-2xl rounded-tl-sm border border-white/5')}>{msg.message}</span>
+                  </div>
+                );
+              })}
               <div ref={chatBottomRef} />
             </div>
-            <form onSubmit={e => { e.preventDefault(); const message = chatInput.trim(); if (!message || !socketRef.current) return; setMessages(prev => [...prev, { id: Date.now(), userId: myId, userName: myName, message, timestamp: new Date().toISOString(), isOwn: true }]); socketRef.current.emit('chat-message', { meetingId, message }); setChatInput(''); }} className="p-3 border-t border-border flex gap-2 shrink-0 bg-background pt-4">
-              <input type="text" value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder="Type a message..." className="flex-1 bg-muted border border-border rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary" />
-              <button type="submit" disabled={!chatInput.trim()} className="bg-primary hover:bg-primary/90 disabled:opacity-40 text-primary-foreground px-3 py-2 rounded-xl text-sm transition-colors font-medium cursor-pointer disabled:cursor-not-allowed">Send</button>
+            <form onSubmit={e => { e.preventDefault(); const message = chatInput.trim(); if (!message || !socketRef.current) return; setMessages(prev => [...prev, { id: Date.now(), userId: myId, userName: myName, message, timestamp: new Date().toISOString(), isOwn: true }]); socketRef.current.emit('chat-message', { meetingId, message }); setChatInput(''); }} className="p-4 flex gap-2 shrink-0 bg-[#1A1B24]/95 border-t border-white/5">
+              <input type="text" value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder="Send a message..." className="flex-1 bg-[#282933] border border-white/10 rounded-full px-4 py-3 text-sm text-white placeholder:text-white/40 focus:outline-none focus:border-[#00E676]/50 focus:ring-1 focus:ring-[#00E676]/50 transition-all shadow-inner" />
+              <button type="submit" disabled={!chatInput.trim()} className="bg-white/10 hover:bg-[#00E676]/20 disabled:opacity-30 disabled:hover:bg-white/10 text-[#00E676] h-[46px] w-[46px] flex items-center justify-center rounded-full transition-colors cursor-pointer disabled:cursor-not-allowed shrink-0 border border-white/5"><MessageSquare className="h-5 w-5" /></button>
             </form>
           </div>
         )}
@@ -851,24 +868,26 @@ export default function MeetingRoom({ meetingId, user }) {
 
 function LocalTile({ videoRef, name, isHost, isAudioEnabled, isVideoEnabled, isScreenSharing, isHandRaised, isPinned, onPin, onFullscreen, large, thumbnail, isFullscreen, gallery, stream, isActiveSpeaker, onAudioLevel, audioEnabled, audioLevel }) {
   useAudioLevel(stream, audioEnabled !== false, onAudioLevel);
+  const initials = name.split(' ').map(n => n[0] || '').join('').slice(0, 2).toUpperCase() || 'You';
   return (
-    <div className={cn('relative bg-slate-900 border border-border/50 rounded-xl overflow-hidden shadow-lg group', large ? 'w-full aspect-video' : thumbnail ? 'w-40 aspect-video shrink-0' : gallery ? 'w-full aspect-video' : 'w-full aspect-video')}>
+    <div className={cn('relative bg-[#1A1B24] rounded-[24px] overflow-hidden shadow-lg group', large ? 'w-full aspect-video' : thumbnail ? 'w-40 aspect-video shrink-0 rounded-xl' : gallery ? 'w-full aspect-video' : 'w-full aspect-video', isActiveSpeaker ? 'speaker-active' : 'ring-1 ring-white/5')}>
       <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover" />
       {!isVideoEnabled && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-muted/80 gap-2">
-          <div className="w-14 h-14 rounded-full bg-slate-800 flex items-center justify-center"><CameraOff className="h-7 w-7 text-muted-foreground" /></div>
-          {!thumbnail && <span className="text-muted-foreground font-medium text-sm">Camera off</span>}
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#1A1B24] gap-2">
+          <div className="w-20 h-20 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg border-2 border-white/10">
+            <span className="text-2xl font-semibold text-white tracking-wider">{initials}</span>
+          </div>
         </div>
       )}
-      <SpeakerRing isActive={isActiveSpeaker} level={audioLevel} thumbnail={thumbnail} />
-      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-start justify-end p-2 gap-1">
-        <TileBtn onClick={onPin} title={isPinned ? 'Unpin' : 'Pin'}>{isPinned ? <PinOff className="h-3.5 w-3.5" /> : <Pin className="h-3.5 w-3.5" />}</TileBtn>
-        <TileBtn onClick={onFullscreen} title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}>{isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}</TileBtn>
+      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-start justify-end p-3 gap-1.5">
+        <TileBtn onClick={onPin} title={isPinned ? 'Unpin' : 'Pin'}>{isPinned ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}</TileBtn>
+        <TileBtn onClick={onFullscreen} title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}>{isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}</TileBtn>
       </div>
-      <div className="absolute bottom-0 left-0 right-0 px-2 py-1.5 bg-gradient-to-t from-black/70 to-transparent flex items-center gap-1.5">
-        <span className="text-white text-xs font-medium truncate">{name}{isHost ? ' · Host' : ''}{isScreenSharing ? ' · Screen' : ''}</span>
+      <div className="absolute bottom-0 left-0 right-0 px-4 py-3 bg-gradient-to-t from-black/80 via-black/40 to-transparent flex items-center gap-2">
+        <span className="text-white text-sm font-medium tracking-wide truncate">{name}{isHost ? ' (Host)' : ''}{isScreenSharing ? ' (Screen)' : ''}</span>
         {isHandRaised && <span>✋</span>}
-        {!isAudioEnabled && <MicOff className="h-3 w-3 text-red-400 ml-auto shrink-0" />}
+        {!isAudioEnabled && <div className="ml-auto bg-red-500/80 p-1 rounded-full backdrop-blur-sm"><MicOff className="h-3 w-3 text-white shrink-0" /></div>}
+        {isAudioEnabled && isActiveSpeaker && <div className="ml-auto bg-[#00E676]/80 p-1 rounded-full backdrop-blur-sm"><Mic className="h-3 w-3 text-white shrink-0" /></div>}
       </div>
     </div>
   );
@@ -887,39 +906,44 @@ function RemoteTile({ userId, stream, name, isMuted, isCameraOff, isHandRaised, 
   const initials = name.split(' ').map(n => n[0] || '').join('').slice(0, 2).toUpperCase() || '??';
   const showCameraOff = isCameraOff || !hasVideo;
   return (
-    <div className={cn('relative bg-slate-900 border border-border/50 rounded-xl overflow-hidden shadow-lg group', large ? 'w-full aspect-video' : thumbnail ? 'w-40 aspect-video shrink-0' : gallery ? 'w-full aspect-video' : 'w-full aspect-video')}>
+    <div className={cn('relative bg-[#1A1B24] rounded-[24px] overflow-hidden shadow-lg group', large ? 'w-full aspect-video' : thumbnail ? 'w-40 aspect-video shrink-0 rounded-xl' : gallery ? 'w-full aspect-video' : 'w-full aspect-video', isActiveSpeaker ? 'speaker-active' : 'ring-1 ring-white/5')}>
       <video ref={videoRef} autoPlay playsInline className={cn('w-full h-full object-cover', showCameraOff && 'hidden')} />
       {showCameraOff && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-muted/80 gap-2">
-          <div className="w-14 h-14 rounded-full bg-slate-800 flex items-center justify-center shadow-lg border border-border/30">
-            {isCameraOff ? <CameraOff className="h-7 w-7 text-muted-foreground" /> : <span className="text-xl font-bold text-slate-200">{initials}</span>}
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#1A1B24] gap-2">
+          <div className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center shadow-lg border-2 border-white/10">
+            <span className="text-2xl font-semibold text-white tracking-wider">{initials}</span>
           </div>
-          {!thumbnail && <span className="text-muted-foreground font-medium text-sm">{isCameraOff ? `${name} · Camera off` : name}</span>}
         </div>
       )}
-      <SpeakerRing isActive={isActiveSpeaker} level={audioLevel} thumbnail={thumbnail} />
-      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-start justify-end p-2 gap-1">
-        <TileBtn onClick={onPin} title={isPinned ? 'Unpin' : 'Pin'}>{isPinned ? <PinOff className="h-3.5 w-3.5" /> : <Pin className="h-3.5 w-3.5" />}</TileBtn>
-        <TileBtn onClick={onFullscreen} title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}>{isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}</TileBtn>
+      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-start justify-end p-3 gap-1.5">
+        <TileBtn onClick={onPin} title={isPinned ? 'Unpin' : 'Pin'}>{isPinned ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}</TileBtn>
+        <TileBtn onClick={onFullscreen} title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}>{isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}</TileBtn>
       </div>
-      <div className="absolute bottom-0 left-0 right-0 px-2 py-1.5 bg-gradient-to-t from-black/70 to-transparent flex items-center gap-1.5">
-        <span className="text-white text-xs font-medium truncate">{name}</span>
+      <div className="absolute bottom-0 left-0 right-0 px-4 py-3 bg-gradient-to-t from-black/80 via-black/40 to-transparent flex items-center gap-2">
+        <span className="text-white text-sm font-medium tracking-wide truncate">{name}</span>
         {isHandRaised && <span>✋</span>}
-        {isMuted && <MicOff className="h-3 w-3 text-red-400 ml-auto shrink-0" />}
+        {isMuted && <div className="ml-auto bg-red-500/80 p-1 rounded-full backdrop-blur-sm"><MicOff className="h-3 w-3 text-white shrink-0" /></div>}
+        {!isMuted && isActiveSpeaker && <div className="ml-auto bg-[#00E676]/80 p-1 rounded-full backdrop-blur-sm"><Mic className="h-3 w-3 text-white shrink-0" /></div>}
       </div>
     </div>
   );
 }
 
 function TileBtn({ onClick, title, children }) {
-  return (<button onClick={onClick} title={title} className="bg-black/60 backdrop-blur hover:bg-black/80 text-white p-1.5 rounded-md transition-colors">{children}</button>);
+  return (<button onClick={onClick} title={title} className="bg-black/40 backdrop-blur-md hover:bg-black/60 text-white p-2 rounded-full transition-colors border border-white/10 shadow-sm">{children}</button>);
 }
 
 function CtrlBtn({ onClick, children, label, danger, highlight, warn }) {
   return (
-    <div className="flex flex-col items-center gap-1.5">
-      <button onClick={onClick} className={cn('h-12 w-12 rounded-full border flex items-center justify-center transition-all duration-200 hover:scale-105', danger ? 'bg-red-500/10 border-red-500 text-red-500 hover:bg-red-500/20' : highlight ? 'bg-primary/10 border-primary text-primary hover:bg-primary/20' : warn ? 'bg-yellow-500/10 border-yellow-500 text-yellow-500 hover:bg-yellow-500/20' : 'bg-muted border-border text-foreground hover:bg-muted/80')}>{children}</button>
-      <span className="text-[11px] font-medium text-muted-foreground">{label}</span>
+    <div className="relative group flex flex-col items-center">
+      <button onClick={onClick} className={cn(
+        'h-14 w-14 rounded-full flex items-center justify-center transition-all duration-200 shadow-sm',
+        danger ? 'bg-[#EA4335] text-white hover:bg-[#D93025]'
+        : highlight ? 'bg-[#8AB4F8]/20 text-[#8AB4F8]'
+        : warn ? 'bg-[#F9AB00]/20 text-[#F9AB00]'
+        : 'bg-[#3C4043] text-[#E8EAED] hover:bg-[#474A4D]'
+      )}>{children}</button>
+      <span className="absolute -top-10 opacity-0 group-hover:opacity-100 text-xs text-[#E8EAED] bg-[#2D2E30] px-2.5 py-1.5 rounded-md transition-opacity whitespace-nowrap pointer-events-none z-50 font-medium">{label}</span>
     </div>
   );
 }
