@@ -135,7 +135,7 @@ function NetworkWarningBanner({ onDismiss }) {
 
 function useInactivity(timeoutMs = 10000) {
   const [isIdle, setIsIdle] = useState(false);
-  
+
   useEffect(() => {
     let timeout;
     const resetTimer = () => {
@@ -165,7 +165,7 @@ function ControlsBar({ isAudioEnabled, isVideoEnabled, isScreenSharing, isMobile
   const isVisible = !isIdle || isHovered || showReactions;
 
   return (
-    <div 
+    <div
       className={cn("fixed bottom-8 left-1/2 -translate-x-1/2 z-50 pointer-events-auto meeting-controls-wrap", !isVisible && "idle")}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -194,9 +194,9 @@ function ControlsBar({ isAudioEnabled, isVideoEnabled, isScreenSharing, isMobile
         </div>
 
         {isHost && (<CtrlBtn onClick={isRecording ? stopRecording : startRecording} label={isRecording ? 'Stop recording' : 'Record meeting'} danger={isRecording}><Circle className={cn('h-5 w-5', isRecording && 'fill-current')} /></CtrlBtn>)}
-        
+
         <div className="w-px h-8 bg-white/10 mx-2" />
-        
+
         {isHost && (
           <button onClick={handleEndMeeting} disabled={isEndingMeeting} className="h-14 px-6 rounded-full bg-red-700 hover:bg-red-800 disabled:opacity-50 flex items-center justify-center transition-colors text-white font-medium shadow-sm" title="End Meeting for All">
             <StopCircle className="h-5 w-5 mr-2" /> End
@@ -247,7 +247,7 @@ export default function MeetingRoom({ meetingId, user, meetingName }) {
   const [participantMediaState, setParticipantMediaState] = useState({});
   const [theme, setTheme] = useState('dark');
   const [reactions, setReactions] = useState([]);
-  
+
   const isIdle = useInactivity(10000);
 
   const isMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
@@ -709,7 +709,17 @@ export default function MeetingRoom({ meetingId, user, meetingName }) {
           setIsRecording(false);
         });
         toast.dismiss('end-meeting');
-      } else { stopMyRecording(); }
+      } else {
+        await stopMyRecording();
+      }
+      // FIX: Host must also flush per-device audio to S3. Non-hosts do this
+      // automatically via the 'meeting-ended' socket event, but the host calls
+      // handleEndMeeting directly and would skip flush-my-chunks entirely,
+      // making the host invisible to scanPerDeviceAudio() in the worker.
+      if (socketRef.current?.connected) {
+        socketRef.current.emit('flush-my-chunks', { meetingId });
+        await new Promise(r => setTimeout(r, 2000)); // wait for S3 upload
+      }
       toast.success('Meeting ended'); cleanup(); router.push(`/meetings/${meetingId}`);
     } catch (e) { toast.error(e?.response?.data?.message || 'Failed to end meeting'); setIsEndingMeeting(false); }
   }, [isHost, isRecording, meetingId, stopMyRecording]);
@@ -962,9 +972,9 @@ function CtrlBtn({ onClick, children, label, danger, highlight, warn }) {
       <button onClick={onClick} className={cn(
         'h-14 w-14 rounded-full flex items-center justify-center transition-all duration-200 shadow-sm',
         danger ? 'bg-[#EA4335] text-white hover:bg-[#D93025]'
-        : highlight ? 'bg-[#8AB4F8]/20 text-[#8AB4F8]'
-        : warn ? 'bg-[#F9AB00]/20 text-[#F9AB00]'
-        : 'bg-[#3C4043] text-[#E8EAED] hover:bg-[#474A4D]'
+          : highlight ? 'bg-[#8AB4F8]/20 text-[#8AB4F8]'
+            : warn ? 'bg-[#F9AB00]/20 text-[#F9AB00]'
+              : 'bg-[#3C4043] text-[#E8EAED] hover:bg-[#474A4D]'
       )}>{children}</button>
       <span className="absolute -top-10 opacity-0 group-hover:opacity-100 text-xs text-[#E8EAED] bg-[#2D2E30] px-2.5 py-1.5 rounded-md transition-opacity whitespace-nowrap pointer-events-none z-50 font-medium">{label}</span>
     </div>
