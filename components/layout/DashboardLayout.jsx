@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import ThemeToggle from '@/components/shared/ThemeToggle'
 import toast from 'react-hot-toast'
+import { getSocket } from '@/lib/socket'
 
 // ── Nav Grouping ────────────────────────────────────────────────────────
 const userNavGroups = [
@@ -102,7 +103,7 @@ export default function DashboardLayout({ children }) {
   const router = useRouter()
   const { user, logout } = useAuthStore()
   const { isAdmin } = useAuth()
-  const { notifications, unreadCount, fetchNotifications, markAsRead } = useNotificationStore()
+  const { notifications, unreadCount, fetchNotifications, markAsRead, addNotification } = useNotificationStore()
 
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
@@ -145,7 +146,21 @@ export default function DashboardLayout({ children }) {
 
   useEffect(() => {
     fetchNotifications(50)
-  }, [fetchNotifications])
+
+    // Global Socket for Real-Time Push Notifications
+    const socket = getSocket();
+    
+    const handleNewNotification = (notif) => {
+      addNotification(notif);
+      toast.success(notif.title || 'New Notification', { icon: '🔔' });
+    };
+
+    socket.on('new-notification', handleNewNotification);
+
+    return () => {
+      socket.off('new-notification', handleNewNotification);
+    };
+  }, [fetchNotifications, addNotification])
 
   const handleLogout = async () => {
     await logout()

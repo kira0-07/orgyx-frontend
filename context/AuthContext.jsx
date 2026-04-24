@@ -82,6 +82,18 @@ export function AuthProvider({ children }) {
     initialized,
   };
 
+  // Prevent flash of content/double-render while verifying auth
+  const isPublicRoute = PUBLIC_ROUTES.some(r => r === '/' ? pathname === '/' : pathname?.startsWith(r));
+  
+  if (!initialized && !isPublicRoute) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center space-y-4">
+        <div className="animate-spin h-10 w-10 border-4 border-primary border-t-transparent rounded-full" />
+        <p className="text-muted-foreground text-sm font-medium animate-pulse">Loading OrgOS...</p>
+      </div>
+    );
+  }
+
   return (
     <AuthContext.Provider value={value}>
       {children}

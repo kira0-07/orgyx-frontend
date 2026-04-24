@@ -133,38 +133,14 @@ function NetworkWarningBanner({ onDismiss }) {
   );
 }
 
-function useInactivity(timeoutMs = 10000) {
-  const [isIdle, setIsIdle] = useState(false);
+// Auto-hiding removed as requested
 
-  useEffect(() => {
-    let timeout;
-    const resetTimer = () => {
-      setIsIdle(false);
-      clearTimeout(timeout);
-      timeout = setTimeout(() => setIsIdle(true), timeoutMs);
-    };
-
-    resetTimer();
-
-    const events = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll'];
-    events.forEach(e => document.addEventListener(e, resetTimer, { passive: true }));
-
-    return () => {
-      clearTimeout(timeout);
-      events.forEach(e => document.removeEventListener(e, resetTimer));
-    };
-  }, [timeoutMs]);
-
-  return isIdle;
-}
-
-function ControlsBar({ isAudioEnabled, isVideoEnabled, isScreenSharing, isMobile, isHandRaised, isRecording, isHost, isEndingMeeting, toggleAudio, toggleVideo, toggleScreenShare, toggleHand, startRecording, stopRecording, handleEndMeeting, leaveMeeting, triggerReaction, isIdle, layoutMode, toggleLayout }) {
+function ControlsBar({ isAudioEnabled, isVideoEnabled, isScreenSharing, isMobile, isHandRaised, isRecording, isHost, isEndingMeeting, toggleAudio, toggleVideo, toggleScreenShare, toggleHand, startRecording, stopRecording, handleEndMeeting, leaveMeeting, triggerReaction, layoutMode, toggleLayout }) {
   const [showReactions, setShowReactions] = useState(false);
-  const isVisible = !isIdle || showReactions;
 
   return (
-    <div className={cn("fixed bottom-0 left-0 right-0 z-50 pointer-events-auto transition-transform duration-300", isIdle ? "translate-y-full" : "translate-y-0")}>
-      <div className="flex items-center justify-center gap-4 px-6 py-4 bg-[var(--jitsi-toolbar-bg)] shadow-2xl border-t border-white/5">
+    <div className="fixed bottom-0 left-0 right-0 z-50 pointer-events-auto">
+      <div className="flex items-center md:justify-center gap-2 md:gap-4 px-3 md:px-6 py-3 md:py-4 bg-[var(--jitsi-toolbar-bg)] shadow-2xl border-t border-white/5 overflow-x-auto hide-scrollbar flex-nowrap w-full">
 
         {/* Audio / Video Group */}
         <div className="flex items-center gap-2">
@@ -216,7 +192,7 @@ function ControlsBar({ isAudioEnabled, isVideoEnabled, isScreenSharing, isMobile
         <div className="jitsi-toolbar-separator" />
 
         {/* Leave Actions */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           {isHost && (
             <CtrlBtn onClick={handleEndMeeting} disabled={isEndingMeeting} label="End for All" danger>
               <StopCircle className="h-5 w-5" />
@@ -285,7 +261,7 @@ export default function MeetingRoom({ meetingId, user, meetingName }) {
     return () => clearInterval(timer);
   }, [meetingStartTime]);
 
-  const isIdle = useInactivity(10000);
+  // Idle timeout logic removed
 
   const isMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
   const myId = (user?._id || user?.id)?.toString();
@@ -816,7 +792,7 @@ export default function MeetingRoom({ meetingId, user, meetingName }) {
   const zoomedId = shouldZoom ? activeSpeakerId : null;
   const spotlightId = pinnedUserId || zoomedId || 'local'; // Default to local in stage view if nobody speaking
 
-  const controlsProps = { isAudioEnabled, isVideoEnabled, isScreenSharing, isMobile, isHandRaised, isRecording, isHost, isEndingMeeting, toggleAudio, toggleVideo, toggleScreenShare, toggleHand, startRecording, stopRecording, handleEndMeeting, leaveMeeting, triggerReaction: triggerReactionEvent, isIdle, layoutMode, toggleLayout: () => setLayoutMode(p => p === 'stage' ? 'tile' : 'stage') };
+  const controlsProps = { isAudioEnabled, isVideoEnabled, isScreenSharing, isMobile, isHandRaised, isRecording, isHost, isEndingMeeting, toggleAudio, toggleVideo, toggleScreenShare, toggleHand, startRecording, stopRecording, handleEndMeeting, leaveMeeting, triggerReaction: triggerReactionEvent, layoutMode, toggleLayout: () => setLayoutMode(p => p === 'stage' ? 'tile' : 'stage') };
   const remoteProps = (uid) => ({ isMuted: participantMediaState[uid]?.audio === false, isCameraOff: participantMediaState[uid]?.video === false });
 
   return (
@@ -841,14 +817,12 @@ export default function MeetingRoom({ meetingId, user, meetingName }) {
       )}
 
       {/* Jitsi Style Top Bar */}
-      <header className={cn("absolute top-0 left-0 right-0 h-14 flex items-center justify-between px-6 z-40 bg-black/60 transition-opacity duration-300", isIdle && "opacity-0 pointer-events-none")}>
-        <div className="flex items-center gap-4 pointer-events-auto">
+      <header className="absolute top-0 left-0 right-0 h-14 flex items-center justify-between px-3 md:px-6 z-40 bg-black/60 transition-opacity duration-300">
+        <div className="flex items-center gap-2 md:gap-4 pointer-events-auto">
           <div className="text-white font-bold text-xl tracking-tighter flex items-center gap-2">
-            <div className="w-8 h-8 rounded-sm bg-[#00E676] flex items-center justify-center text-black text-lg">O</div>
-            OrgyX
+            <div className="w-8 h-8 rounded-sm bg-[#00E676] flex items-center justify-center text-black text-lg shrink-0">O</div>
           </div>
-          <div className="h-5 w-px bg-white/20" />
-          <h1 className="font-medium text-white/90 text-sm">{meetingName || 'Meeting'}</h1>
+          <h1 className="font-medium text-white/90 text-sm max-w-[140px] sm:max-w-[200px] md:max-w-md truncate">{meetingName || 'Meeting'}</h1>
 
           <div className="flex items-center gap-2 text-xs font-medium bg-black/40 px-2 py-1 rounded">
             {elapsedTime}
@@ -1001,10 +975,11 @@ function LocalTile({ videoRef, name, role, isHost, isAudioEnabled, isVideoEnable
 
   return (
     <div className={cn(
-      'jitsi-video-tile h-full w-full flex items-center justify-center group',
+      'jitsi-video-tile h-full w-full flex items-center justify-center group relative',
       isHandRaised && 'jitsi-hand-raised',
       isActiveSpeaker && 'speaker-active'
     )}>
+      <SpeakerRing isActive={isActiveSpeaker} level={audioLevel} thumbnail={thumbnail} />
       <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover" />
 
       {!isVideoEnabled && (
@@ -1026,7 +1001,6 @@ function LocalTile({ videoRef, name, role, isHost, isAudioEnabled, isVideoEnable
       {/* Jitsi Indicators */}
       <div className="jitsi-top-indicators">
         {!isAudioEnabled && <div className="jitsi-indicator-icon text-red-500"><MicOff className="h-3 w-3" /></div>}
-        {isAudioEnabled && isActiveSpeaker && <div className="jitsi-indicator-icon text-[#00E676]"><Mic className="h-3 w-3 animate-pulse" /></div>}
       </div>
 
       <div className="jitsi-name-badge flex flex-col items-start px-3 py-1.5 bg-black/60 backdrop-blur-md rounded-lg mb-2 ml-2">
@@ -1052,10 +1026,11 @@ function RemoteTile({ userId, stream, name, role, isMuted, isCameraOff, isHandRa
 
   return (
     <div className={cn(
-      'jitsi-video-tile h-full w-full flex items-center justify-center group',
+      'jitsi-video-tile h-full w-full flex items-center justify-center group relative',
       isHandRaised && 'jitsi-hand-raised',
       isActiveSpeaker && 'speaker-active'
     )}>
+      <SpeakerRing isActive={isActiveSpeaker} level={audioLevel} thumbnail={thumbnail} />
       <video ref={videoRef} autoPlay playsInline className={cn('w-full h-full object-cover', showCameraOff && 'hidden')} />
 
       {showCameraOff && (
@@ -1077,7 +1052,6 @@ function RemoteTile({ userId, stream, name, role, isMuted, isCameraOff, isHandRa
       {/* Jitsi Indicators */}
       <div className="jitsi-top-indicators">
         {isMuted && <div className="jitsi-indicator-icon text-red-500"><MicOff className="h-3 w-3" /></div>}
-        {!isMuted && isActiveSpeaker && <div className="jitsi-indicator-icon text-[#00E676]"><Mic className="h-3 w-3 animate-pulse" /></div>}
       </div>
 
       <div className="jitsi-name-badge flex flex-col items-start px-3 py-1.5 bg-black/60 backdrop-blur-md rounded-lg mb-2 ml-2">
@@ -1094,9 +1068,9 @@ function TileBtn({ onClick, title, children }) {
 
 function CtrlBtn({ onClick, children, label, danger, highlight, warn, disabled }) {
   return (
-    <div className="relative group flex flex-col items-center">
+    <div className="relative group flex flex-col items-center shrink-0">
       <button disabled={disabled} onClick={onClick} className={cn(
-        'h-12 w-12 rounded-full flex items-center justify-center transition-colors',
+        'h-10 w-10 md:h-12 md:w-12 rounded-full flex items-center justify-center transition-colors',
         disabled ? 'opacity-30 cursor-not-allowed' :
           danger ? 'bg-red-600 text-white hover:bg-red-700'
             : highlight ? 'bg-[#00E676] text-black hover:bg-[#00E676]/80'
