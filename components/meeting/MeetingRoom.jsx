@@ -811,9 +811,9 @@ export default function MeetingRoom({ meetingId, user, meetingName }) {
               </div>
             </div>
           ) : (
-            <div className="flex-1 overflow-y-auto meeting-gallery-grid">
+            <div className="flex-1 overflow-y-auto meeting-gallery-grid custom-scrollbar">
               <div className={cn("transition-all duration-300 w-full", totalParticipants === 1 ? "max-w-6xl" : "max-w-2xl")}>
-                <LocalTile videoRef={setLocalVideoRef} name={myName} isHost={isHost} isAudioEnabled={isAudioEnabled} isVideoEnabled={isVideoEnabled} isScreenSharing={isScreenSharing} isHandRaised={raisedHands.has(myId)} isPinned={pinnedUserId === 'local'} onPin={() => setPinnedUserId('local')} onFullscreen={() => handleFullscreen('local')} gallery stream={localStreamRef.current} audioEnabled={isAudioEnabled} isActiveSpeaker={activeSpeakerId === myId} audioLevel={ringLevels[myId] || 0} onAudioLevel={lvl => handleAudioLevel(myId, lvl)} />
+                <LocalTile videoRef={setLocalVideoRef} name={myName} isHost={isHost} isAudioEnabled={isAudioEnabled} isVideoEnabled={isVideoEnabled} isScreenSharing={isScreenSharing} isHandRaised={raisedHands.has(myId)} isPinned={pinnedUserId === 'local'} onPin={() => setPinnedUserId(p => p === 'local' ? null : 'local')} onFullscreen={() => handleFullscreen('local')} gallery stream={localStreamRef.current} audioEnabled={isAudioEnabled} isActiveSpeaker={activeSpeakerId === myId} audioLevel={ringLevels[myId] || 0} onAudioLevel={lvl => handleAudioLevel(myId, lvl)} />
               </div>
               {remoteEntries.map(([uid, st]) => (
                 <div key={uid} className="transition-all duration-300 w-full max-w-2xl">
@@ -826,35 +826,73 @@ export default function MeetingRoom({ meetingId, user, meetingName }) {
 
         {chatOpen && (
           <div className={cn(
-            "glass-panel border-white/5 flex flex-col z-50 shadow-2xl animate-chat-slide-in",
-            isMobile ? "fixed inset-x-0 bottom-0 h-[65vh] rounded-t-3xl border-t bg-[#1A1B23]/95 backdrop-blur-xl" : "w-full md:w-[380px] border-l shrink-0 absolute md:static right-0 top-0 bottom-0 bg-[#0D0E17]/95"
+            "glass-panel border-white/5 flex flex-col z-50 shadow-[0_0_40px_rgba(0,0,0,0.5)] animate-chat-slide-in transition-all duration-300",
+            isMobile ? "fixed inset-x-0 bottom-0 h-[70vh] rounded-t-[32px] border-t bg-[#0B0C14]/98 backdrop-blur-2xl" : "w-full md:w-[400px] border-l shrink-0 absolute md:static right-0 top-0 bottom-0 bg-[#0D0E17]/90 backdrop-blur-3xl"
           )}>
-            {isMobile && <div className="w-12 h-1.5 bg-white/20 rounded-full mx-auto mt-3 cursor-pointer hover:bg-white/30 transition-colors" onClick={() => setChatOpen(false)} />}
-            <div className="p-5 border-b border-white/5 flex items-center justify-between shrink-0"><span className="font-semibold text-white tracking-wide">In-call messages</span><button onClick={() => setChatOpen(false)} className="text-white/60 hover:text-white transition-colors bg-white/5 hover:bg-white/10 p-1.5 rounded-full"><X className="h-4 w-4" /></button></div>
-            <div className="flex-1 min-h-0 overflow-y-auto p-5 space-y-4">
-              <div className="text-center p-4 bg-[#282933]/50 rounded-xl mb-4 border border-white/5">
-                <p className="text-white/60 text-xs leading-relaxed">Messages can only be seen by people in the call and are deleted when the call ends.</p>
+            {isMobile && <div className="w-12 h-1.5 bg-white/10 rounded-full mx-auto mt-4 cursor-pointer hover:bg-white/20 transition-colors" onClick={() => setChatOpen(false)} />}
+            <div className="px-6 py-5 border-b border-white/5 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-[#00E676] shadow-[0_0_8px_#00E676]" />
+                <span className="font-semibold text-white tracking-tight text-lg">In-call messages</span>
               </div>
-              {messages.length === 0 ? null : messages.map((msg, idx) => {
+              <button onClick={() => setChatOpen(false)} className="text-white/40 hover:text-white transition-all bg-white/5 hover:bg-white/10 p-2 rounded-xl border border-white/5">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-6 custom-scrollbar">
+              <div className="text-center p-4 bg-white/5 rounded-2xl mb-2 border border-white/5 backdrop-blur-sm">
+                <p className="text-white/40 text-[11px] font-medium uppercase tracking-widest leading-relaxed">Security & Privacy</p>
+                <p className="text-white/60 text-xs mt-1">Messages are visible only to participants and cleared when the meeting ends.</p>
+              </div>
+
+              {messages.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full opacity-20 py-12">
+                  <MessageSquare className="h-12 w-12 mb-4" />
+                  <p className="text-sm">No messages yet</p>
+                </div>
+              ) : messages.map((msg, idx) => {
                 const prevMsg = messages[idx - 1];
                 const showHeader = !prevMsg || prevMsg.userId !== msg.userId || (new Date(msg.timestamp) - new Date(prevMsg.timestamp) > 60000);
                 return (
-                  <div key={msg.id} className={cn('flex flex-col gap-1 animate-msg-fade-in', msg.isOwn ? 'items-end' : 'items-start')}>
+                  <div key={msg.id} className={cn('flex flex-col gap-1.5 animate-msg-fade-in group', msg.isOwn ? 'items-end' : 'items-start')}>
                     {showHeader && (
-                      <div className="flex items-baseline gap-2 px-1 mt-2">
-                        <span className="text-[13px] font-medium text-white/80">{msg.isOwn ? 'You' : msg.userName}</span>
-                        <span className="text-[10px] text-white/40 font-medium tracking-wider">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                      <div className="flex items-baseline gap-2 px-1 mb-0.5">
+                        <span className="text-[12px] font-bold text-white/90">{msg.isOwn ? 'You' : msg.userName}</span>
+                        <span className="text-[9px] text-white/30 font-bold uppercase tracking-tighter">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                       </div>
                     )}
-                    <span className={cn('inline-block px-4 py-2 text-[14px] max-w-[280px] break-words shadow-sm leading-relaxed', msg.isOwn ? 'bg-[#00E676] text-black font-medium rounded-2xl rounded-tr-sm' : 'bg-[#282933] text-white/90 rounded-2xl rounded-tl-sm border border-white/5')}>{msg.message}</span>
+                    <div className={cn(
+                      'px-4 py-2.5 text-[14px] max-w-[85%] break-words shadow-lg leading-relaxed transition-transform group-hover:scale-[1.01]',
+                      msg.isOwn 
+                        ? 'bg-gradient-to-br from-[#00E676] to-[#00C853] text-black font-semibold rounded-[20px] rounded-tr-[4px]' 
+                        : 'bg-[#1A1B24] text-white/90 rounded-[20px] rounded-tl-[4px] border border-white/10'
+                    )}>
+                      {msg.message}
+                    </div>
                   </div>
                 );
               })}
               <div ref={chatBottomRef} />
             </div>
-            <form onSubmit={e => { e.preventDefault(); const message = chatInput.trim(); if (!message || !socketRef.current) return; setMessages(prev => [...prev, { id: Date.now(), userId: myId, userName: myName, message, timestamp: new Date().toISOString(), isOwn: true }]); socketRef.current.emit('chat-message', { meetingId, message }); setChatInput(''); }} className="p-4 flex gap-2 shrink-0 bg-[#1A1B24]/95 border-t border-white/5">
-              <input type="text" value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder="Send a message..." className="flex-1 bg-[#282933] border border-white/10 rounded-full px-4 py-3 text-sm text-white placeholder:text-white/40 focus:outline-none focus:border-[#00E676]/50 focus:ring-1 focus:ring-[#00E676]/50 transition-all shadow-inner" />
-              <button type="submit" disabled={!chatInput.trim()} className="bg-white/10 hover:bg-[#00E676]/20 disabled:opacity-30 disabled:hover:bg-white/10 text-[#00E676] h-[46px] w-[46px] flex items-center justify-center rounded-full transition-colors cursor-pointer disabled:cursor-not-allowed shrink-0 border border-white/5"><MessageSquare className="h-5 w-5" /></button>
+
+            <form onSubmit={e => { e.preventDefault(); const message = chatInput.trim(); if (!message || !socketRef.current) return; setMessages(prev => [...prev, { id: Date.now(), userId: myId, userName: myName, message, timestamp: new Date().toISOString(), isOwn: true }]); socketRef.current.emit('chat-message', { meetingId, message }); setChatInput(''); }} className="p-6 shrink-0 bg-[#0D0E17]/50 backdrop-blur-xl border-t border-white/5">
+              <div className="relative flex items-center gap-3">
+                <input 
+                  type="text" 
+                  value={chatInput} 
+                  onChange={e => setChatInput(e.target.value)} 
+                  placeholder="Send a message..." 
+                  className="flex-1 bg-[#1A1B24] border border-white/10 rounded-2xl px-5 py-3.5 text-[15px] text-white placeholder:text-white/20 focus:outline-none focus:border-[#00E676]/40 focus:ring-4 focus:ring-[#00E676]/5 transition-all shadow-2xl" 
+                />
+                <button 
+                  type="submit" 
+                  disabled={!chatInput.trim()} 
+                  className="bg-white/5 hover:bg-[#00E676]/20 disabled:opacity-20 disabled:hover:bg-white/5 text-[#00E676] h-[52px] w-[52px] flex items-center justify-center rounded-2xl transition-all border border-white/5 shadow-xl hover:scale-105 active:scale-95 disabled:hover:scale-100"
+                >
+                  <MessageSquare className="h-6 w-6" />
+                </button>
+              </div>
             </form>
           </div>
         )}
@@ -869,24 +907,35 @@ function LocalTile({ videoRef, name, isHost, isAudioEnabled, isVideoEnabled, isS
   useAudioLevel(stream, audioEnabled !== false, onAudioLevel);
   const initials = name.split(' ').map(n => n[0] || '').join('').slice(0, 2).toUpperCase() || 'You';
   return (
-    <div className={cn('relative bg-[#1A1B24] rounded-[24px] overflow-hidden shadow-lg group', large ? 'w-full aspect-video' : thumbnail ? 'w-40 aspect-video shrink-0 rounded-xl' : gallery ? 'w-full aspect-video' : 'w-full aspect-video', isActiveSpeaker ? 'speaker-active' : 'ring-1 ring-white/5')}>
-      <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover" />
+    <div className={cn(
+      'relative bg-[#1A1B24] rounded-[32px] overflow-hidden shadow-2xl transition-all duration-500 group', 
+      large ? 'w-full h-full' : thumbnail ? 'w-48 aspect-video shrink-0 rounded-2xl' : gallery ? 'w-full aspect-video' : 'w-full aspect-video', 
+      isActiveSpeaker ? 'ring-[3px] ring-[#00E676] ring-offset-4 ring-offset-[#0D0E17]' : 'ring-1 ring-white/10'
+    )}>
+      <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover scale-[1.01]" />
       {!isVideoEnabled && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#1A1B24] gap-2">
-          <div className="w-20 h-20 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg border-2 border-white/10">
-            <span className="text-2xl font-semibold text-white tracking-wider">{initials}</span>
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-[#1A1B24] to-[#0D0E17] gap-4">
+          <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-primary/20 to-primary/40 flex items-center justify-center shadow-[0_0_40px_rgba(var(--primary),0.1)] border border-white/10">
+            <span className="text-3xl font-bold text-white tracking-widest drop-shadow-md">{initials}</span>
           </div>
+          {isAudioEnabled && <div className="flex gap-1 items-center h-4">{[1,2,3,4].map(i => <div key={i} className="w-1.5 bg-primary/40 rounded-full animate-pulse" style={{height: `${Math.random()*100}%`, animationDelay: `${i*150}ms`}} />)}</div>}
         </div>
       )}
-      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-start justify-end p-3 gap-1.5">
-        <TileBtn onClick={onPin} title={isPinned ? 'Unpin' : 'Pin'}>{isPinned ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}</TileBtn>
-        <TileBtn onClick={onFullscreen} title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}>{isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}</TileBtn>
+      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30 opacity-0 group-hover:opacity-100 transition-all duration-300">
+        <div className="absolute top-4 right-4 flex gap-2">
+          <TileBtn onClick={onPin} title={isPinned ? 'Unpin' : 'Pin'}>{isPinned ? <PinOff className="h-5 w-5" /> : <Pin className="h-5 w-5" />}</TileBtn>
+          <TileBtn onClick={onFullscreen} title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}>{isFullscreen ? <Minimize2 className="h-5 w-5" /> : <Maximize2 className="h-5 w-5" />}</TileBtn>
+        </div>
       </div>
-      <div className="absolute bottom-0 left-0 right-0 px-4 py-3 bg-gradient-to-t from-black/80 via-black/40 to-transparent flex items-center gap-2">
-        <span className="text-white text-sm font-medium tracking-wide truncate">{name}{isHost ? ' (Host)' : ''}{isScreenSharing ? ' (Screen)' : ''}</span>
-        {isHandRaised && <span className="hand-raised-indicator text-lg drop-shadow-md">✋</span>}
-        {!isAudioEnabled && <div className="ml-auto bg-red-500/80 p-1 rounded-full backdrop-blur-sm"><MicOff className="h-3 w-3 text-white shrink-0" /></div>}
-        {isAudioEnabled && isActiveSpeaker && <div className="ml-auto bg-[#00E676]/80 p-1 rounded-full backdrop-blur-sm"><Mic className="h-3 w-3 text-white shrink-0" /></div>}
+      <div className="absolute bottom-5 left-6 right-6 flex items-center justify-between">
+        <div className="flex items-center gap-3 bg-black/40 backdrop-blur-xl px-4 py-2 rounded-2xl border border-white/10 shadow-xl">
+          <span className="text-white text-[13px] font-bold tracking-tight truncate max-w-[150px]">{name}{isHost ? ' (Host)' : ''}{isScreenSharing ? ' (Screen)' : ''}</span>
+          {isHandRaised && <span className="hand-raised-indicator text-xl">✋</span>}
+        </div>
+        <div className="flex gap-2">
+          {!isAudioEnabled && <div className="bg-red-500/90 p-2 rounded-xl backdrop-blur-md shadow-lg border border-white/20"><MicOff className="h-4 w-4 text-white shrink-0" /></div>}
+          {isAudioEnabled && isActiveSpeaker && <div className="bg-[#00E676]/90 p-2 rounded-xl backdrop-blur-md shadow-lg border border-white/20"><Mic className="h-4 w-4 text-white shrink-0 animate-pulse" /></div>}
+        </div>
       </div>
     </div>
   );
@@ -905,44 +954,59 @@ function RemoteTile({ userId, stream, name, isMuted, isCameraOff, isHandRaised, 
   const initials = name.split(' ').map(n => n[0] || '').join('').slice(0, 2).toUpperCase() || '??';
   const showCameraOff = isCameraOff || !hasVideo;
   return (
-    <div className={cn('relative bg-[#1A1B24] rounded-[24px] overflow-hidden shadow-lg group', large ? 'w-full aspect-video' : thumbnail ? 'w-40 aspect-video shrink-0 rounded-xl' : gallery ? 'w-full aspect-video' : 'w-full aspect-video', isActiveSpeaker ? 'speaker-active' : 'ring-1 ring-white/5')}>
-      <video ref={videoRef} autoPlay playsInline className={cn('w-full h-full object-cover', showCameraOff && 'hidden')} />
+    <div className={cn(
+      'relative bg-[#1A1B24] rounded-[32px] overflow-hidden shadow-2xl transition-all duration-500 group', 
+      large ? 'w-full h-full' : thumbnail ? 'w-48 aspect-video shrink-0 rounded-2xl' : gallery ? 'w-full aspect-video' : 'w-full aspect-video', 
+      isActiveSpeaker ? 'ring-[3px] ring-[#00E676] ring-offset-4 ring-offset-[#0D0E17]' : 'ring-1 ring-white/10'
+    )}>
+      <video ref={videoRef} autoPlay playsInline className={cn('w-full h-full object-cover scale-[1.01]', showCameraOff && 'hidden')} />
       {showCameraOff && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#1A1B24] gap-2">
-          <div className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center shadow-lg border-2 border-white/10">
-            <span className="text-2xl font-semibold text-white tracking-wider">{initials}</span>
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-[#1A1B24] to-[#0D0E17] gap-4">
+          <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-cyan-500/20 to-blue-600/40 flex items-center justify-center shadow-[0_0_40px_rgba(0,188,212,0.1)] border border-white/10">
+            <span className="text-3xl font-bold text-white tracking-widest drop-shadow-md">{initials}</span>
           </div>
+          {!isMuted && <div className="flex gap-1 items-center h-4">{[1,2,3,4].map(i => <div key={i} className="w-1.5 bg-cyan-400/40 rounded-full animate-pulse" style={{height: `${Math.random()*100}%`, animationDelay: `${i*150}ms`}} />)}</div>}
         </div>
       )}
-      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-start justify-end p-3 gap-1.5">
-        <TileBtn onClick={onPin} title={isPinned ? 'Unpin' : 'Pin'}>{isPinned ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}</TileBtn>
-        <TileBtn onClick={onFullscreen} title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}>{isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}</TileBtn>
+      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30 opacity-0 group-hover:opacity-100 transition-all duration-300">
+        <div className="absolute top-4 right-4 flex gap-2">
+          <TileBtn onClick={onPin} title={isPinned ? 'Unpin' : 'Pin'}>{isPinned ? <PinOff className="h-5 w-5" /> : <Pin className="h-5 w-5" />}</TileBtn>
+          <TileBtn onClick={onFullscreen} title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}>{isFullscreen ? <Minimize2 className="h-5 w-5" /> : <Maximize2 className="h-5 w-5" />}</TileBtn>
+        </div>
       </div>
-      <div className="absolute bottom-0 left-0 right-0 px-4 py-3 bg-gradient-to-t from-black/80 via-black/40 to-transparent flex items-center gap-2">
-        <span className="text-white text-sm font-medium tracking-wide truncate">{name}</span>
-        {isHandRaised && <span className="hand-raised-indicator text-lg drop-shadow-md">✋</span>}
-        {isMuted && <div className="ml-auto bg-red-500/80 p-1 rounded-full backdrop-blur-sm"><MicOff className="h-3 w-3 text-white shrink-0" /></div>}
-        {!isMuted && isActiveSpeaker && <div className="ml-auto bg-[#00E676]/80 p-1 rounded-full backdrop-blur-sm"><Mic className="h-3 w-3 text-white shrink-0" /></div>}
+      <div className="absolute bottom-5 left-6 right-6 flex items-center justify-between">
+        <div className="flex items-center gap-3 bg-black/40 backdrop-blur-xl px-4 py-2 rounded-2xl border border-white/10 shadow-xl">
+          <span className="text-white text-[13px] font-bold tracking-tight truncate max-w-[150px]">{name}</span>
+          {isHandRaised && <span className="hand-raised-indicator text-xl">✋</span>}
+        </div>
+        <div className="flex gap-2">
+          {isMuted && <div className="bg-red-500/90 p-2 rounded-xl backdrop-blur-md shadow-lg border border-white/20"><MicOff className="h-4 w-4 text-white shrink-0" /></div>}
+          {!isMuted && isActiveSpeaker && <div className="bg-[#00E676]/90 p-2 rounded-xl backdrop-blur-md shadow-lg border border-white/20"><Mic className="h-4 w-4 text-white shrink-0 animate-pulse" /></div>}
+        </div>
       </div>
     </div>
   );
 }
 
 function TileBtn({ onClick, title, children }) {
-  return (<button onClick={onClick} title={title} className="bg-black/40 backdrop-blur-md hover:bg-black/60 text-white p-2 rounded-full transition-colors border border-white/10 shadow-sm">{children}</button>);
+  return (<button onClick={onClick} title={title} className="bg-white/10 backdrop-blur-2xl hover:bg-white/20 text-white p-2.5 rounded-2xl transition-all border border-white/10 shadow-2xl hover:scale-110 active:scale-90">{children}</button>);
 }
 
 function CtrlBtn({ onClick, children, label, danger, highlight, warn }) {
   return (
     <div className="relative group flex flex-col items-center">
       <button onClick={onClick} className={cn(
-        'h-14 w-14 rounded-full flex items-center justify-center transition-all duration-200 shadow-sm',
-        danger ? 'bg-[#EA4335] text-white hover:bg-[#D93025]'
-          : highlight ? 'bg-[#8AB4F8]/20 text-[#8AB4F8]'
-            : warn ? 'bg-[#F9AB00]/20 text-[#F9AB00]'
-              : 'bg-[#3C4043] text-[#E8EAED] hover:bg-[#474A4D]'
+        'h-14 w-14 rounded-2xl flex items-center justify-center transition-all duration-300 shadow-2xl border border-white/5 hover:scale-110 active:scale-95',
+        danger ? 'bg-[#EA4335] text-white hover:bg-[#D93025] shadow-red-500/10'
+          : highlight ? 'bg-primary/20 text-primary border-primary/20 shadow-primary/10'
+            : warn ? 'bg-[#F9AB00]/20 text-[#F9AB00] border-[#F9AB00]/20'
+              : 'bg-white/5 text-white/90 hover:bg-white/10'
       )}>{children}</button>
-      <span className="absolute -top-10 opacity-0 group-hover:opacity-100 text-xs text-[#E8EAED] bg-[#2D2E30] px-2.5 py-1.5 rounded-md transition-opacity whitespace-nowrap pointer-events-none z-50 font-medium">{label}</span>
+      <div className="absolute -top-12 opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none z-50 transform translate-y-2 group-hover:translate-y-0">
+        <div className="bg-[#0D0E17] text-white/90 text-[11px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-lg border border-white/10 shadow-2xl whitespace-nowrap">
+          {label}
+        </div>
+      </div>
     </div>
   );
 }
