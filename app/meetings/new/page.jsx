@@ -34,6 +34,7 @@ export default function NewMeetingPage() {
     name: '',
     description: '',
     scheduledDate: '',
+    scheduledTime: '',
     estimatedDuration: '60',
     domain: '',
     agenda: '',
@@ -61,13 +62,15 @@ export default function NewMeetingPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.name.trim()) { toast.error('Meeting name is required'); return; }
-    if (!formData.scheduledDate) { toast.error('Date and time is required'); return; }
+    if (!formData.scheduledDate || !formData.scheduledTime) { toast.error('Date and time are required'); return; }
     if (!formData.domain) { toast.error('Please select a domain'); return; }
 
     setIsLoading(true);
     try {
+      const dateTimeString = `${formData.scheduledDate}T${formData.scheduledTime}`;
       await api.post('/meetings', {
         ...formData,
+        scheduledDate: dateTimeString,
         estimatedDuration: parseInt(formData.estimatedDuration),
         attendees: formData.attendees.map(id => ({ user: id }))
       });
@@ -159,27 +162,30 @@ export default function NewMeetingPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="scheduledDate" className="text-foreground flex items-center gap-1.5">
-                      <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                      Date & Time <span className="text-destructive">*</span>
+                      <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                      Date <span className="text-destructive">*</span>
                     </Label>
                     <Input
                       id="scheduledDate"
-                      type="datetime-local"
+                      type="date"
                       value={formData.scheduledDate}
                       onChange={(e) => setFormData({ ...formData, scheduledDate: e.target.value })}
-                      className="bg-muted border-border text-foreground"
+                      className="bg-muted border-border text-foreground [&::-webkit-calendar-picker-indicator]:invert-[0.8]"
                       required
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="estimatedDuration" className="text-foreground">Duration (minutes)</Label>
+                    <Label htmlFor="scheduledTime" className="text-foreground flex items-center gap-1.5">
+                      <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                      Time <span className="text-destructive">*</span>
+                    </Label>
                     <Input
-                      id="estimatedDuration"
-                      type="number"
-                      min="1"
-                      value={formData.estimatedDuration}
-                      onChange={(e) => setFormData({ ...formData, estimatedDuration: e.target.value })}
-                      className="bg-muted border-border text-foreground"
+                      id="scheduledTime"
+                      type="time"
+                      value={formData.scheduledTime}
+                      onChange={(e) => setFormData({ ...formData, scheduledTime: e.target.value })}
+                      className="bg-muted border-border text-foreground [&::-webkit-calendar-picker-indicator]:invert-[0.8]"
+                      required
                     />
                   </div>
                 </div>
