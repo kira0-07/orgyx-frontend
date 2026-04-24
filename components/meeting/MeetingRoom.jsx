@@ -133,11 +133,43 @@ function NetworkWarningBanner({ onDismiss }) {
   );
 }
 
-function ControlsBar({ isAudioEnabled, isVideoEnabled, isScreenSharing, isMobile, isHandRaised, isRecording, isHost, isEndingMeeting, toggleAudio, toggleVideo, toggleScreenShare, toggleHand, startRecording, stopRecording, handleEndMeeting, leaveMeeting, triggerReaction }) {
+function useInactivity(timeoutMs = 10000) {
+  const [isIdle, setIsIdle] = useState(false);
+  
+  useEffect(() => {
+    let timeout;
+    const resetTimer = () => {
+      setIsIdle(false);
+      clearTimeout(timeout);
+      timeout = setTimeout(() => setIsIdle(true), timeoutMs);
+    };
+
+    resetTimer();
+
+    const events = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll'];
+    events.forEach(e => document.addEventListener(e, resetTimer, { passive: true }));
+
+    return () => {
+      clearTimeout(timeout);
+      events.forEach(e => document.removeEventListener(e, resetTimer));
+    };
+  }, [timeoutMs]);
+
+  return isIdle;
+}
+
+function ControlsBar({ isAudioEnabled, isVideoEnabled, isScreenSharing, isMobile, isHandRaised, isRecording, isHost, isEndingMeeting, toggleAudio, toggleVideo, toggleScreenShare, toggleHand, startRecording, stopRecording, handleEndMeeting, leaveMeeting, triggerReaction, isIdle }) {
   const [showReactions, setShowReactions] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+
+  const isVisible = !isIdle || isHovered || showReactions;
 
   return (
-    <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 pointer-events-auto">
+    <div 
+      className={cn("fixed bottom-8 left-1/2 -translate-x-1/2 z-50 pointer-events-auto meeting-controls-wrap", !isVisible && "idle")}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
       <div className="flex items-center gap-3 px-6 py-3 rounded-2xl bg-[#202124]/80 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.4)] border border-white/5">
         <CtrlBtn onClick={toggleAudio} label={isAudioEnabled ? 'Turn off microphone' : 'Turn on microphone'} danger={!isAudioEnabled}>{isAudioEnabled ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}</CtrlBtn>
         <CtrlBtn onClick={toggleVideo} label={isVideoEnabled ? 'Turn off camera' : 'Turn on camera'} danger={!isVideoEnabled}>{isVideoEnabled ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}</CtrlBtn>
@@ -215,6 +247,8 @@ export default function MeetingRoom({ meetingId, user, meetingName }) {
   const [participantMediaState, setParticipantMediaState] = useState({});
   const [theme, setTheme] = useState('dark');
   const [reactions, setReactions] = useState([]);
+  
+  const isIdle = useInactivity(10000);
 
   const isMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
   const myId = (user?._id || user?.id)?.toString();
@@ -706,7 +740,7 @@ export default function MeetingRoom({ meetingId, user, meetingName }) {
   const shouldZoom = !pinnedUserId && totalParticipants > 1 && activeSpeakerId !== null;
   const zoomedId = shouldZoom ? activeSpeakerId : null;
 
-  const controlsProps = { isAudioEnabled, isVideoEnabled, isScreenSharing, isMobile, isHandRaised, isRecording, isHost, isEndingMeeting, toggleAudio, toggleVideo, toggleScreenShare, toggleHand, startRecording, stopRecording, handleEndMeeting, leaveMeeting, triggerReaction: triggerReactionEvent };
+  const controlsProps = { isAudioEnabled, isVideoEnabled, isScreenSharing, isMobile, isHandRaised, isRecording, isHost, isEndingMeeting, toggleAudio, toggleVideo, toggleScreenShare, toggleHand, startRecording, stopRecording, handleEndMeeting, leaveMeeting, triggerReaction: triggerReactionEvent, isIdle };
   const remoteProps = (uid) => ({ isMuted: participantMediaState[uid]?.audio === false, isCameraOff: participantMediaState[uid]?.video === false });
 
   const getGridClasses = (count) => {
@@ -753,11 +787,16 @@ export default function MeetingRoom({ meetingId, user, meetingName }) {
         </div>
       )}
 
-      <header className="absolute top-0 left-0 right-0 px-6 py-4 flex items-center justify-between shrink-0 z-40 bg-gradient-to-b from-black/60 to-transparent pointer-events-none">
+      <header className={cn("absolute top-0 left-0 right-0 px-6 py-4 flex items-center justify-between shrink-0 z-40 bg-gradient-to-b from-black/60 to-transparent pointer-events-none meeting-header-wrap", isIdle && "idle")}>
         <div className="flex items-center gap-3 pointer-events-auto">
           <h1 className="font-medium text-white/90 text-sm tracking-wide">{meetingName || 'Meeting Room'}</h1>
           {isRecording && (<Badge className="bg-red-500/20 text-red-400 border border-red-500/30 flex items-center gap-1.5 animate-pulse rounded-md px-2 py-0.5"><Circle className="h-2 w-2 fill-red-500" /> REC</Badge>)}
-          {raisedHands.size > 0 && (<Badge className="bg-[#F9AB00]/20 text-[#F9AB00] border border-[#F9AB00]/30 rounded-md px-2 py-0.5">✋ {raisedHands.size}</Badge>)}
+          {raisedHands.size > 0 && (
+            <Badge className="bg-[#F9AB00]/20 text-[#F9AB00] border border-[#F9AB00]/30 rounded-md px-2 py-0.5">
+              ✋ {Array.from(raisedHands).slice(0, 2).map(id => id === myId ? 'You' : (participantNames[id] || 'Someone')).join(', ')}
+              {raisedHands.size > 2 && ` +${raisedHands.size - 2}`}
+            </Badge>
+          )}
           {networkWarning && (<Badge className="bg-amber-500/20 text-amber-500 border border-amber-500/30 flex items-center gap-1.5 rounded-md px-2 py-0.5"><WifiOff className="h-3 w-3" /> Unstable</Badge>)}
         </div>
         <div className="flex items-center gap-4 pointer-events-auto">
@@ -778,59 +817,43 @@ export default function MeetingRoom({ meetingId, user, meetingName }) {
       )}
 
       <div className="flex-1 min-h-0 flex overflow-hidden relative">
-        <div className={cn('flex-1 min-w-0 overflow-hidden transition-all duration-200 h-full flex flex-col', chatOpen && 'md:mr-80')}>
-          {pinnedUserId ? (
-            <div className="flex flex-col gap-2 h-full p-2">
-              <div className="flex-1 min-h-0 flex items-center justify-center">
-                <div className="w-full h-full max-w-6xl flex items-center justify-center">
-                  {pinnedUserId === 'local' ? (
+        <div className={cn('flex-1 min-w-0 overflow-hidden transition-all duration-200 h-full flex flex-col', chatOpen && !isMobile && 'md:mr-[380px]')}>
+          {spotlightId ? (
+            <div className="flex flex-col md:flex-row gap-2 h-full p-2">
+              <div className="flex-1 min-w-0 min-h-0 flex items-center justify-center spotlight-enter">
+                <div className="w-full h-full flex items-center justify-center">
+                  {spotlightId === 'local' ? (
                     <LocalTile videoRef={setLocalVideoRef} name={myName} isHost={isHost} isAudioEnabled={isAudioEnabled} isVideoEnabled={isVideoEnabled} isScreenSharing={isScreenSharing} isHandRaised={raisedHands.has(myId)} isPinned onPin={() => setPinnedUserId(null)} onFullscreen={() => handleFullscreen('local')} large stream={localStreamRef.current} audioEnabled={isAudioEnabled} isActiveSpeaker={activeSpeakerId === myId} audioLevel={ringLevels[myId] || 0} onAudioLevel={lvl => handleAudioLevel(myId, lvl)} />
                   ) : (
-                    <RemoteTile userId={pinnedUserId} stream={remoteStreams[pinnedUserId]} name={getParticipantName(pinnedUserId)} isHandRaised={raisedHands.has(pinnedUserId)} isPinned onPin={() => setPinnedUserId(null)} onFullscreen={() => handleFullscreen(pinnedUserId)} large isActiveSpeaker={activeSpeakerId === pinnedUserId} audioLevel={ringLevels[pinnedUserId] || 0} onAudioLevel={lvl => handleAudioLevel(pinnedUserId, lvl)} {...remoteProps(pinnedUserId)} />
+                    <RemoteTile userId={spotlightId} stream={remoteStreams[spotlightId]} name={getParticipantName(spotlightId)} isHandRaised={raisedHands.has(spotlightId)} isPinned onPin={() => setPinnedUserId(null)} onFullscreen={() => handleFullscreen(spotlightId)} large isActiveSpeaker={activeSpeakerId === spotlightId} audioLevel={ringLevels[spotlightId] || 0} onAudioLevel={lvl => handleAudioLevel(spotlightId, lvl)} {...remoteProps(spotlightId)} />
                   )}
                 </div>
               </div>
-              <div className="h-32 shrink-0 flex gap-2 overflow-x-auto overflow-y-hidden pb-2 justify-center">
-                {pinnedUserId !== 'local' && (<LocalTile videoRef={setLocalVideoRef} name="You" isHost={isHost} isAudioEnabled={isAudioEnabled} isVideoEnabled={isVideoEnabled} isScreenSharing={isScreenSharing} isHandRaised={raisedHands.has(myId)} isPinned={false} onPin={() => setPinnedUserId('local')} onFullscreen={() => handleFullscreen('local')} thumbnail stream={localStreamRef.current} audioEnabled={isAudioEnabled} isActiveSpeaker={activeSpeakerId === myId} audioLevel={ringLevels[myId] || 0} onAudioLevel={lvl => handleAudioLevel(myId, lvl)} />)}
-                {remoteEntries.filter(([uid]) => uid !== pinnedUserId).map(([uid, st]) => (<RemoteTile key={uid} userId={uid} stream={st} name={getParticipantName(uid)} isHandRaised={raisedHands.has(uid)} isPinned={false} onPin={() => setPinnedUserId(uid)} onFullscreen={() => handleFullscreen(uid)} thumbnail isActiveSpeaker={activeSpeakerId === uid} audioLevel={ringLevels[uid] || 0} onAudioLevel={lvl => handleAudioLevel(uid, lvl)} {...remoteProps(uid)} />))}
+              <div className="h-32 md:h-full md:w-48 shrink-0 flex md:flex-col gap-2 overflow-x-auto md:overflow-y-auto md:overflow-x-hidden pb-2 md:pb-0 md:pr-2 justify-start items-center">
+                {spotlightId !== 'local' && (<LocalTile videoRef={setLocalVideoRef} name="You" isHost={isHost} isAudioEnabled={isAudioEnabled} isVideoEnabled={isVideoEnabled} isScreenSharing={isScreenSharing} isHandRaised={raisedHands.has(myId)} isPinned={false} onPin={() => setPinnedUserId('local')} onFullscreen={() => handleFullscreen('local')} thumbnail stream={localStreamRef.current} audioEnabled={isAudioEnabled} isActiveSpeaker={activeSpeakerId === myId} audioLevel={ringLevels[myId] || 0} onAudioLevel={lvl => handleAudioLevel(myId, lvl)} />)}
+                {remoteEntries.filter(([uid]) => uid !== spotlightId).map(([uid, st]) => (<RemoteTile key={uid} userId={uid} stream={st} name={getParticipantName(uid)} isHandRaised={raisedHands.has(uid)} isPinned={false} onPin={() => setPinnedUserId(uid)} onFullscreen={() => handleFullscreen(uid)} thumbnail isActiveSpeaker={activeSpeakerId === uid} audioLevel={ringLevels[uid] || 0} onAudioLevel={lvl => handleAudioLevel(uid, lvl)} {...remoteProps(uid)} />))}
               </div>
             </div>
-
-          ) : zoomedId ? (
-            <div className="flex flex-col gap-2 h-full p-2">
-              <div className="flex-1 min-h-0 flex items-center justify-center">
-                <div className="w-full h-full max-w-6xl flex items-center justify-center">
-                  {zoomedId === myId ? (
-                    <LocalTile videoRef={setLocalVideoRef} name={myName} isHost={isHost} isAudioEnabled={isAudioEnabled} isVideoEnabled={isVideoEnabled} isScreenSharing={isScreenSharing} isHandRaised={raisedHands.has(myId)} isPinned={false} onPin={() => setPinnedUserId('local')} onFullscreen={() => handleFullscreen('local')} large stream={localStreamRef.current} audioEnabled={isAudioEnabled} isActiveSpeaker audioLevel={ringLevels[myId] || 0} onAudioLevel={lvl => handleAudioLevel(myId, lvl)} />
-                  ) : (
-                    <RemoteTile userId={zoomedId} stream={remoteStreams[zoomedId]} name={getParticipantName(zoomedId)} isHandRaised={raisedHands.has(zoomedId)} isPinned={false} onPin={() => setPinnedUserId(zoomedId)} onFullscreen={() => handleFullscreen(zoomedId)} large isActiveSpeaker audioLevel={ringLevels[zoomedId] || 0} onAudioLevel={lvl => handleAudioLevel(zoomedId, lvl)} {...remoteProps(zoomedId)} />
-                  )}
-                </div>
-              </div>
-              <div className="h-32 shrink-0 flex gap-2 overflow-x-auto overflow-y-hidden pb-2 justify-center">
-                {zoomedId !== myId && (<LocalTile videoRef={setLocalVideoRef} name="You" isHost={isHost} isAudioEnabled={isAudioEnabled} isVideoEnabled={isVideoEnabled} isScreenSharing={isScreenSharing} isHandRaised={raisedHands.has(myId)} isPinned={false} onPin={() => setPinnedUserId('local')} onFullscreen={() => handleFullscreen('local')} thumbnail stream={localStreamRef.current} audioEnabled={isAudioEnabled} isActiveSpeaker={activeSpeakerId === myId} audioLevel={ringLevels[myId] || 0} onAudioLevel={lvl => handleAudioLevel(myId, lvl)} />)}
-                {remoteEntries.filter(([uid]) => uid !== zoomedId).map(([uid, st]) => (<RemoteTile key={uid} userId={uid} stream={st} name={getParticipantName(uid)} isHandRaised={raisedHands.has(uid)} isPinned={false} onPin={() => setPinnedUserId(uid)} onFullscreen={() => handleFullscreen(uid)} thumbnail isActiveSpeaker={activeSpeakerId === uid} audioLevel={ringLevels[uid] || 0} onAudioLevel={lvl => handleAudioLevel(uid, lvl)} {...remoteProps(uid)} />))}
-              </div>
-            </div>
-
           ) : (
-            <div className="flex-1 overflow-y-auto p-2">
-              <div className="flex flex-wrap items-center justify-center content-center gap-3 h-full w-full">
-                <div className={cn("transition-all duration-300", tileWidthClass)}>
-                  <LocalTile videoRef={setLocalVideoRef} name={myName} isHost={isHost} isAudioEnabled={isAudioEnabled} isVideoEnabled={isVideoEnabled} isScreenSharing={isScreenSharing} isHandRaised={raisedHands.has(myId)} isPinned={pinnedUserId === 'local'} onPin={() => setPinnedUserId('local')} onFullscreen={() => handleFullscreen('local')} gallery stream={localStreamRef.current} audioEnabled={isAudioEnabled} isActiveSpeaker={activeSpeakerId === myId} audioLevel={ringLevels[myId] || 0} onAudioLevel={lvl => handleAudioLevel(myId, lvl)} />
-                </div>
-                {remoteEntries.map(([uid, st]) => (
-                  <div key={uid} className={cn("transition-all duration-300", tileWidthClass)}>
-                    <RemoteTile userId={uid} stream={st} name={getParticipantName(uid)} isHandRaised={raisedHands.has(uid)} isPinned={pinnedUserId === uid} onPin={() => setPinnedUserId(p => p === uid ? null : uid)} onFullscreen={() => handleFullscreen(uid)} gallery isActiveSpeaker={activeSpeakerId === uid} audioLevel={ringLevels[uid] || 0} onAudioLevel={lvl => handleAudioLevel(uid, lvl)} {...remoteProps(uid)} />
-                  </div>
-                ))}
+            <div className="flex-1 overflow-y-auto meeting-gallery-grid">
+              <div className={cn("transition-all duration-300 w-full", totalParticipants === 1 ? "max-w-6xl" : "max-w-2xl")}>
+                <LocalTile videoRef={setLocalVideoRef} name={myName} isHost={isHost} isAudioEnabled={isAudioEnabled} isVideoEnabled={isVideoEnabled} isScreenSharing={isScreenSharing} isHandRaised={raisedHands.has(myId)} isPinned={pinnedUserId === 'local'} onPin={() => setPinnedUserId('local')} onFullscreen={() => handleFullscreen('local')} gallery stream={localStreamRef.current} audioEnabled={isAudioEnabled} isActiveSpeaker={activeSpeakerId === myId} audioLevel={ringLevels[myId] || 0} onAudioLevel={lvl => handleAudioLevel(myId, lvl)} />
               </div>
+              {remoteEntries.map(([uid, st]) => (
+                <div key={uid} className="transition-all duration-300 w-full max-w-2xl">
+                  <RemoteTile userId={uid} stream={st} name={getParticipantName(uid)} isHandRaised={raisedHands.has(uid)} isPinned={pinnedUserId === uid} onPin={() => setPinnedUserId(p => p === uid ? null : uid)} onFullscreen={() => handleFullscreen(uid)} gallery isActiveSpeaker={activeSpeakerId === uid} audioLevel={ringLevels[uid] || 0} onAudioLevel={lvl => handleAudioLevel(uid, lvl)} {...remoteProps(uid)} />
+                </div>
+              ))}
             </div>
           )}
         </div>
 
         {chatOpen && (
-          <div className="w-full md:w-[380px] glass-panel border-l border-white/5 flex flex-col shrink-0 absolute md:static right-0 top-0 bottom-0 z-40 shadow-2xl animate-chat-slide-in">
+          <div className={cn(
+            "glass-panel border-white/5 flex flex-col z-50 shadow-2xl animate-chat-slide-in",
+            isMobile ? "fixed inset-x-0 bottom-0 h-[65vh] rounded-t-3xl border-t bg-[#1A1B23]/95 backdrop-blur-xl" : "w-full md:w-[380px] border-l shrink-0 absolute md:static right-0 top-0 bottom-0 bg-[#0D0E17]/95"
+          )}>
+            {isMobile && <div className="w-12 h-1.5 bg-white/20 rounded-full mx-auto mt-3 cursor-pointer hover:bg-white/30 transition-colors" onClick={() => setChatOpen(false)} />}
             <div className="p-5 border-b border-white/5 flex items-center justify-between shrink-0"><span className="font-semibold text-white tracking-wide">In-call messages</span><button onClick={() => setChatOpen(false)} className="text-white/60 hover:text-white transition-colors bg-white/5 hover:bg-white/10 p-1.5 rounded-full"><X className="h-4 w-4" /></button></div>
             <div className="flex-1 min-h-0 overflow-y-auto p-5 space-y-4">
               <div className="text-center p-4 bg-[#282933]/50 rounded-xl mb-4 border border-white/5">
@@ -885,7 +908,7 @@ function LocalTile({ videoRef, name, isHost, isAudioEnabled, isVideoEnabled, isS
       </div>
       <div className="absolute bottom-0 left-0 right-0 px-4 py-3 bg-gradient-to-t from-black/80 via-black/40 to-transparent flex items-center gap-2">
         <span className="text-white text-sm font-medium tracking-wide truncate">{name}{isHost ? ' (Host)' : ''}{isScreenSharing ? ' (Screen)' : ''}</span>
-        {isHandRaised && <span>✋</span>}
+        {isHandRaised && <span className="hand-raised-indicator text-lg drop-shadow-md">✋</span>}
         {!isAudioEnabled && <div className="ml-auto bg-red-500/80 p-1 rounded-full backdrop-blur-sm"><MicOff className="h-3 w-3 text-white shrink-0" /></div>}
         {isAudioEnabled && isActiveSpeaker && <div className="ml-auto bg-[#00E676]/80 p-1 rounded-full backdrop-blur-sm"><Mic className="h-3 w-3 text-white shrink-0" /></div>}
       </div>
@@ -921,7 +944,7 @@ function RemoteTile({ userId, stream, name, isMuted, isCameraOff, isHandRaised, 
       </div>
       <div className="absolute bottom-0 left-0 right-0 px-4 py-3 bg-gradient-to-t from-black/80 via-black/40 to-transparent flex items-center gap-2">
         <span className="text-white text-sm font-medium tracking-wide truncate">{name}</span>
-        {isHandRaised && <span>✋</span>}
+        {isHandRaised && <span className="hand-raised-indicator text-lg drop-shadow-md">✋</span>}
         {isMuted && <div className="ml-auto bg-red-500/80 p-1 rounded-full backdrop-blur-sm"><MicOff className="h-3 w-3 text-white shrink-0" /></div>}
         {!isMuted && isActiveSpeaker && <div className="ml-auto bg-[#00E676]/80 p-1 rounded-full backdrop-blur-sm"><Mic className="h-3 w-3 text-white shrink-0" /></div>}
       </div>

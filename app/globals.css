@@ -184,3 +184,44 @@
 .animate-msg-fade-in {
   animation: msg-fade-in 0.2s ease-out forwards;
 }
+
+/* Inactivity auto-hide system */
+.meeting-controls-wrap { transition: opacity 500ms ease, transform 500ms ease; }
+.meeting-controls-wrap.idle { opacity: 0; transform: translateY(20px); pointer-events: none; }
+.meeting-header-wrap { transition: opacity 500ms ease, transform 500ms ease; }
+.meeting-header-wrap.idle { opacity: 0; transform: translateY(-100%); pointer-events: none; }
+
+/* Spotlight transition */
+.spotlight-tile { transition: all 400ms cubic-bezier(0.4, 0, 0.2, 1); }
+.spotlight-enter { animation: spotlight-in 400ms ease-out; }
+@keyframes spotlight-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* Hand raise bounce */
+@keyframes hand-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+.hand-raised-indicator {
+  animation: hand-bounce 1.5s ease-in-out infinite;
+}
+
+/* Analyze button ready glow */
+@keyframes ready-glow {
+  0%, 100% { box-shadow: 0 0 8px rgba(139, 92, 246, 0.4); }
+  50% { box-shadow: 0 0 20px rgba(139, 92, 246, 0.7); }
+}
+.analyze-ready { animation: ready-glow 2s ease-in-out infinite; }
+
+/* Gallery grid for meeting tiles */
+.meeting-gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 8px;
+  align-content: center;
+  justify-items: center;
+  height: 100%;
+  padding: 8px;
+}

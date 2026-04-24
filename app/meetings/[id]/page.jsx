@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import { useMeetingDetail } from '@/hooks/useMeetingDetail';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -28,11 +29,9 @@ import toast from 'react-hot-toast';
 export default function MeetingDetailPage({ params }) {
   const router = useRouter();
   const { user } = useAuth();
-  const [meeting, setMeeting] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const { meeting, processingStatus, isLoading, error, refetch, setMeeting, setProcessingStatus } = useMeetingDetail(params?.id);
   const [isEnding, setIsEnding] = useState(false);
   const [showEndConfirm, setShowEndConfirm] = useState(false);
-  const [processingStatus, setProcessingStatus] = useState(null);
   const [activeTab, setActiveTab] = useState('summary');
 
   const [transcriptSegments, setTranscriptSegments] = useState([]);
@@ -46,14 +45,13 @@ export default function MeetingDetailPage({ params }) {
     'text-yellow-400', 'text-pink-400', 'text-cyan-400',
   ];
 
-  useEffect(() => { fetchMeeting(); }, [params?.id]);
-
+  // Handle processing status fallback (WebSocket handles the real-time updates)
   useEffect(() => {
     if (meeting?.status === 'processing') {
-      const interval = setInterval(fetchProcessingStatus, 5000);
+      const interval = setInterval(refetch, 30000); // 30s fallback
       return () => clearInterval(interval);
     }
-  }, [meeting?.status]);
+  }, [meeting?.status, refetch]);
 
   // FIX 3: 60-second cooldown after meeting ends before Analyze button becomes available.
   // If endedAt is missing, secondsSinceEnd = 999, so remaining = Math.max(0, 60-999) = 0
@@ -78,30 +76,7 @@ export default function MeetingDetailPage({ params }) {
     return () => clearInterval(interval);
   }, [meeting?.endedAt]);
 
-  const fetchMeeting = async () => {
-    if (!params?.id) return;
-    try {
-      const response = await api.get(`/meetings/${params.id}`);
-      setMeeting(response.data.meeting);
-      setTranscriptSegments(response.data.meeting?.transcriptSegments || []);
-      if (response.data.meeting?.status === 'processing') fetchProcessingStatus();
-    } catch (error) {
-      console.error('Failed to fetch meeting:', error);
-      toast.error('Failed to fetch meeting details');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const fetchProcessingStatus = async () => {
-    try {
-      const response = await api.get(`/meetings/${params.id}/processing-status`);
-      setProcessingStatus(response.data);
-      if (response.data.status === 'ready') fetchMeeting();
-    } catch (error) {
-      console.error('Failed to fetch processing status:', error);
-    }
-  };
+  // Removed manual fetchMeeting and fetchProcessingStatus here, they are handled by useMeetingDetail
 
   const handleEndMeeting = async () => {
     setShowEndConfirm(false);
@@ -109,7 +84,7 @@ export default function MeetingDetailPage({ params }) {
     try {
       await api.post(`/meetings/${params.id}/end`);
       toast.success('Meeting ended successfully');
-      fetchMeeting();
+      refetch();
     } catch (error) {
       toast.error(error?.response?.data?.message || 'Failed to end meeting');
     } finally {
@@ -481,23 +456,49 @@ export default function MeetingDetailPage({ params }) {
             
             {meeting.status === 'completed' && !isProcessing && (
               meeting.recordingUrl ? (
-                <Button
-                  onClick={async () => {
-                    try {
-                      toast.loading('Starting analysis...', { id: 'analyze' });
-                      await api.post(`/meetings/${meeting._id}/analyze`);
-                      toast.success('Analysis started! Processing your meeting now.', { id: 'analyze', duration: 4000 });
-                      fetchMeeting();
-                    } catch (error) {
-                      toast.error(error?.response?.data?.message || 'Failed to start analysis', { id: 'analyze' });
-                    }
-                  }}
-                  className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50"
-                  disabled={cooldownRemaining > 0}
-                >
-                  <Mic className="mr-2 h-4 w-4" />
-                  {cooldownRemaining > 0 ? `Analyze Meeting (${cooldownRemaining}s)` : 'Analyze Meeting'}
-                </Button>
+                <>
+                  {cooldownRemaining > 0 ? (
+                    <div className="relative group">
+                      <Button
+                        variant="outline"
+                        className="w-full sm:w-auto border-purple-500/20 text-purple-400 bg-purple-500/5 hover:bg-purple-500/10 hover:text-purple-300 relative pl-12 transition-all overflow-hidden"
+                        disabled
+                      >
+                        <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center justify-center">
+                          <svg width="24" height="24" viewBox="0 0 40 40" className="transform -rotate-90">
+                            <circle cx="20" cy="20" r="16" fill="transparent" stroke="currentColor" strokeWidth="4" className="text-purple-500/20" />
+                            <circle
+                              cx="20" cy="20" r="16" fill="transparent" stroke="currentColor" strokeWidth="4"
+                              className="text-purple-400 transition-all duration-1000 ease-linear"
+                              style={{ 
+                                strokeDasharray: 100.5, 
+                                strokeDashoffset: (1 - cooldownRemaining / 60) * 100.5 
+                              }}
+                            />
+                          </svg>
+                          <span className="absolute text-[10px] font-bold text-purple-300">{cooldownRemaining}</span>
+                        </div>
+                        <span className="opacity-70">Waiting for audio sync...</span>
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      onClick={async () => {
+                        try {
+                          toast.loading('Starting analysis...', { id: 'analyze' });
+                          await api.post(`/meetings/${meeting._id}/analyze`);
+                          toast.success('Analysis started! Processing your meeting now.', { id: 'analyze', duration: 4000 });
+                          refetch();
+                        } catch (error) {
+                          toast.error(error?.response?.data?.message || 'Failed to start analysis', { id: 'analyze' });
+                        }
+                      }}
+                      className="w-full sm:w-auto bg-purple-600 hover:bg-purple-700 text-white shadow-lg shadow-purple-500/20 analyze-ready transition-all"
+                    >
+                      ✨ Analyze Meeting
+                    </Button>
+                  )}
+                </>
               ) : (
                 <div className="relative group">
                   <Button disabled className="bg-purple-600/50 cursor-not-allowed">
