@@ -624,50 +624,15 @@ export default function MeetingRoom({ meetingId, user, meetingName }) {
         const blob = new Blob(chunks, { type: 'audio/webm' });
 
         try {
-          toast.loading('Syncing per-device audio logs...', { id: 'upload' });
-
+          // Flush the final per-device audio chunk to the socket queue.
+          // flush-my-chunks (called by handleEndMeeting after this resolves)
+          // will upload everything to S3. The worker reads VAD scores from
+          // S3 sidecar files — perDeviceAudio is no longer sent in the form.
           await stopMyRecording();
-
           await new Promise(r => setTimeout(r, 2500));
-
-          const perDeviceAudio = await new Promise(resolve => {
-            const timeout = setTimeout(() => {
-              console.warn('Per-device audio sync timed out');
-              resolve([]);
-            }, 15000);
-
-            socketRef.current?.once('transcript-queue', ({ perDeviceAudio: pda }) => {
-              clearTimeout(timeout);
-              resolve(pda || []);
-            });
-
-            const expectedParticipants = Object.keys(peersRef.current).length;
-            socketRef.current?.emit('get-transcript-queue', { meetingId, expectedParticipants });
-          });
-
-          // ── FIX: Strip server-internal fields (_vadComplete, audioBuffer) before
-          // sending to the controller. Without this, JSON.stringify serializes raw
-          // Buffer objects as {"type":"Buffer","data":[...]} making the payload
-          // enormous and causing perDeviceAudio to be silently dropped on the server.
-          const cleanedPerDeviceAudio = perDeviceAudio.map(({ _vadComplete, ...device }) => ({
-            userId: device.userId,
-            userName: device.userName,
-            recordingStartTime: device.recordingStartTime,
-            audioKey: device.audioKey,
-            chunks: (device.chunks || []).map(({ audioKey, timestamp, chunkIndex, voiceRatio, hasVoice }) => ({
-              audioKey,
-              timestamp,
-              chunkIndex,
-              voiceRatio,
-              hasVoice,
-            })),
-          }));
 
           const fd = new FormData();
           fd.append('recording', blob, 'meeting-recording.webm');
-          if (cleanedPerDeviceAudio.length > 0) {
-            fd.append('perDeviceAudio', JSON.stringify(cleanedPerDeviceAudio));
-          }
 
           toast.loading('Uploading recording...', { id: 'upload' });
           await api.post(`/meetings/${meetingId}/upload-recording`, fd, {
@@ -749,6 +714,7 @@ export default function MeetingRoom({ meetingId, user, meetingName }) {
   const totalParticipants = remoteEntries.length + 1;
   const shouldZoom = !pinnedUserId && totalParticipants > 1 && activeSpeakerId !== null;
   const zoomedId = shouldZoom ? activeSpeakerId : null;
+  const spotlightId = pinnedUserId || zoomedId;
 
   const controlsProps = { isAudioEnabled, isVideoEnabled, isScreenSharing, isMobile, isHandRaised, isRecording, isHost, isEndingMeeting, toggleAudio, toggleVideo, toggleScreenShare, toggleHand, startRecording, stopRecording, handleEndMeeting, leaveMeeting, triggerReaction: triggerReactionEvent, isIdle };
   const remoteProps = (uid) => ({ isMuted: participantMediaState[uid]?.audio === false, isCameraOff: participantMediaState[uid]?.video === false });
