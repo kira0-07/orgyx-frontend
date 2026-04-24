@@ -42,23 +42,21 @@ export default function NewMeetingPage() {
   });
 
   useEffect(() => {
+    const fetchOrgTreeUsers = async () => {
+      setIsFetchingUsers(true);
+      try {
+        const response = await api.get('/users?limit=100');
+        setUsers(response.data.users || []);
+      } catch (error) {
+        console.error('Failed to fetch users:', error);
+        toast.error('Failed to load team members');
+      } finally {
+        setIsFetchingUsers(false);
+      }
+    };
+    
     fetchOrgTreeUsers();
   }, []);
-
-  const fetchOrgTreeUsers = async () => {
-    setIsFetchingUsers(true);
-    try {
-      const response = await api.get('/users?limit=100');
-      const allUsers = response.data.users || [];
-      const myId = (user?._id || user?.id)?.toString();
-      setUsers(allUsers.filter(u => u._id?.toString() !== myId));
-    } catch (error) {
-      console.error('Failed to fetch users:', error);
-      toast.error('Failed to load team members');
-    } finally {
-      setIsFetchingUsers(false);
-    }
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -99,7 +97,10 @@ export default function NewMeetingPage() {
     }));
   };
 
-  const filteredUsers = users.filter(u =>
+  const myId = (user?._id || user?.id)?.toString();
+  const availableUsers = myId ? users.filter(u => u._id?.toString() !== myId) : users;
+  
+  const filteredUsers = availableUsers.filter(u =>
     `${u.firstName} ${u.lastName} ${u.role}`.toLowerCase()
       .includes(searchUsers.toLowerCase())
   );
