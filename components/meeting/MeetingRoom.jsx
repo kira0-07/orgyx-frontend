@@ -133,8 +133,6 @@ function NetworkWarningBanner({ onDismiss }) {
   );
 }
 
-// Auto-hiding removed as requested
-
 function ControlsBar({ isAudioEnabled, isVideoEnabled, isScreenSharing, isMobile, isHandRaised, isRecording, isHost, isEndingMeeting, toggleAudio, toggleVideo, toggleScreenShare, toggleHand, startRecording, stopRecording, handleEndMeeting, leaveMeeting, triggerReaction, layoutMode, toggleLayout }) {
   const [showReactions, setShowReactions] = useState(false);
 
@@ -216,7 +214,24 @@ export default function MeetingRoom({ meetingId, user, meetingName }) {
   const myRecordingStartTimeRef = useRef(null), audioLevelsRef = useRef({});
   const initSegmentRef = useRef(null);
   const isEndingRef = useRef(false);      // guard: host is running handleEndMeeting — skip meeting-ended socket handler
-  const hasCleanedUpRef = useRef(false); // guard: prevent cleanup() running more than once (multi-caller race)
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // FIX (Issue 3): hasCleanedUpRef prevents cleanup() running more than once.
+  //
+  // Three call paths all converge on cleanup() within milliseconds of each
+  // other when a meeting ends:
+  //   1. leaveMeeting()         — user clicks Leave
+  //   2. 'meeting-ended' handler — host ends meeting, socket event fires
+  //   3. useEffect return        — component unmounts after navigation
+  //
+  // Without this guard all three fire POST /leave simultaneously (visible as
+  // 3× /leave requests with identical timestamps in the server logs).
+  //
+  // useRef is the correct choice here — it persists across renders and
+  // mutations are synchronous (unlike setState which is async and would allow
+  // a second caller to slip through before the state update commits).
+  // ─────────────────────────────────────────────────────────────────────────
+  const hasCleanedUpRef = useRef(false);
 
   const [networkWarning, setNetworkWarning] = useState(false);
   const networkWarningTimerRef = useRef(null);
@@ -260,8 +275,6 @@ export default function MeetingRoom({ meetingId, user, meetingName }) {
     }, 1000);
     return () => clearInterval(timer);
   }, [meetingStartTime]);
-
-  // Idle timeout logic removed
 
   const isMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
   const myId = (user?._id || user?.id)?.toString();
@@ -420,6 +433,42 @@ export default function MeetingRoom({ meetingId, user, meetingName }) {
     myRecorderRef.current = null; myRecordingStartTimeRef.current = null; initSegmentRef.current = null; setIsMyRecording(false);
   }, [meetingId]);
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // cleanup() — tears down media, peers, and socket room membership.
+  //
+  // FIX (Issue 3): hasCleanedUpRef.current guards against this running more
+  // than once. The first caller sets the flag and proceeds; all subsequent
+  // callers (useEffect return, meeting-ended handler, leaveMeeting) return
+  // immediately. This eliminates the 3× simultaneous POST /leave requests.
+  //
+  // Note: stopMyRecording() is intentionally NOT called here. Every call path
+  // that leads to cleanup() is responsible for awaiting stopMyRecording()
+  // first, then emitting flush-my-chunks, then calling cleanup(). This keeps
+  // the ordering correct and avoids a double-stop of the MediaRecorder.
+  // ─────────────────────────────────────────────────────────────────────────
+  const cleanup = useCallback(() => {
+    if (hasCleanedUpRef.current) return;
+    hasCleanedUpRef.current = true;
+
+    localStreamRef.current?.getTracks().forEach(t => t.stop());
+    localStreamRef.current = null;
+    Object.keys(peersRef.current).forEach(uid => {
+      try { peersRef.current[uid]?.destroy(); } catch (_) { }
+      delete peersRef.current[uid];
+    });
+    if (networkWarningTimerRef.current) clearTimeout(networkWarningTimerRef.current);
+
+    try {
+      leaveRoom(meetingId, myId);
+      // Skip POST /leave when the host is ending the meeting — POST /end
+      // already terminates the session server-side. Calling /leave too would
+      // produce duplicate audit log entries and noisy server logs.
+      if (!isEndingRef.current) {
+        api.post(`/meetings/${meetingId}/leave`).catch(() => { });
+      }
+    } catch (_) { }
+  }, [meetingId, myId]);
+
   useEffect(() => {
     let mounted = true;
     const init = async () => {
@@ -518,23 +567,34 @@ export default function MeetingRoom({ meetingId, user, meetingName }) {
 
         socketRef.current.on('recording-stopped', () => { setIsRecording(false); stopMyRecording(); });
 
+        // ── meeting-ended socket handler ────────────────────────────────
+        // Fired on ALL clients (including the host) when the host calls
+        // POST /end. The host skips this via isEndingRef — handleEndMeeting
+        // does its own ordered teardown. Non-host clients run the full path:
+        //   stopMyRecording → flush-my-chunks → wait → cleanup → navigate
         socketRef.current.on('meeting-ended', async () => {
-          // If this client is the host and already running handleEndMeeting,
-          // skip — handleEndMeeting will do its own cleanup + navigation.
-          if (isEndingRef.current) return;
+          if (isEndingRef.current) return; // host is already handling this
           toast.success('Meeting ended by host');
           await stopMyRecording();
           if (socketRef.current?.connected) {
             socketRef.current.emit('flush-my-chunks', { meetingId });
-            // FIX C: increased from 2000 → 3000 ms so the server has enough
-            // time to finish the S3 write before cleanup() closes the socket.
+            // Wait 3s so the server-side background VAD scoring and S3 write
+            // can complete before cleanup() closes the socket connection.
             await new Promise(r => setTimeout(r, 3000));
           }
           cleanup();
           router.push(`/meetings/${meetingId}`);
         });
 
-        socketRef.current.on('meeting-cancelled', ({ message }) => { setMeetingCancelled(true); toast.error(message || 'Meeting has been cancelled by the host'); stopMyRecording(); cleanup(); setTimeout(() => router.push('/meetings/history'), 2000); });
+        socketRef.current.on('meeting-cancelled', ({ message }) => {
+          setMeetingCancelled(true);
+          toast.error(message || 'Meeting has been cancelled by the host');
+          // stopMyRecording first so the final chunk is emitted before cleanup
+          stopMyRecording().then(() => {
+            cleanup();
+            setTimeout(() => router.push('/meetings/history'), 2000);
+          });
+        });
 
         joinRoom(meetingId, myId);
         if (mounted) setIsConnecting(false);
@@ -545,17 +605,22 @@ export default function MeetingRoom({ meetingId, user, meetingName }) {
     };
     init();
 
-    // FIX A: Only run teardown if no explicit leave/end path already claimed
-    // cleanup. hasCleanedUpRef guards cleanup() itself but stopMyRecording()
-    // has no equivalent guard — calling it from here races with leaveMeeting /
-    // handleEndMeeting which also await stopMyRecording(). Skipping both when
-    // cleanup is already done prevents the double-stop of the MediaRecorder.
+    // ── useEffect teardown ──────────────────────────────────────────────
+    // FIX (Issue 3): Only call cleanup() if no explicit leave/end path has
+    // already done so. hasCleanedUpRef inside cleanup() guards the POST /leave
+    // call, but we also skip stopMyRecording() here because every explicit
+    // leave path already awaits it — calling it a second time would attempt to
+    // stop an already-stopped MediaRecorder and emit a duplicate audio-chunk.
     return () => {
       mounted = false;
-      if (!hasCleanedUpRef.current) {
-        stopMyRecording();
-        cleanup();
-      }
+      // cleanup() is safe to call unconditionally — it guards itself with
+      // hasCleanedUpRef and is a no-op if already called. We do NOT call
+      // stopMyRecording() here because:
+      //   • leaveMeeting awaits it before calling cleanup()
+      //   • meeting-ended handler awaits it before calling cleanup()
+      //   • handleEndMeeting awaits it before calling cleanup()
+      // Calling it again here would double-stop the MediaRecorder.
+      cleanup();
     };
   }, [meetingId, myId]);
 
@@ -597,25 +662,6 @@ export default function MeetingRoom({ meetingId, user, meetingName }) {
     setPinnedUserId(prev => prev === userId ? null : prev);
     delete audioLevelsRef.current[userId];
     setRingLevels(prev => { const n = { ...prev }; delete n[userId]; return n; });
-  };
-
-  const cleanup = () => {
-    // Guard: only execute once regardless of how many callers (meeting-ended,
-    // leaveMeeting, useEffect unmount) fire simultaneously.
-    if (hasCleanedUpRef.current) return;
-    hasCleanedUpRef.current = true;
-    localStreamRef.current?.getTracks().forEach(t => t.stop());
-    localStreamRef.current = null;
-    Object.keys(peersRef.current).forEach(destroyPeer);
-    if (networkWarningTimerRef.current) clearTimeout(networkWarningTimerRef.current);
-    try {
-      leaveRoom(meetingId, myId);
-      // Skip /leave when host is ending the meeting — /end already terminates
-      // the session server-side, and the redundant calls cause noisy 4× /leave logs.
-      if (!isEndingRef.current) {
-        api.post(`/meetings/${meetingId}/leave`).catch(() => { });
-      }
-    } catch (_) { }
   };
 
   const toggleAudio = useCallback(() => {
@@ -674,10 +720,6 @@ export default function MeetingRoom({ meetingId, user, meetingName }) {
         const blob = new Blob(chunks, { type: 'audio/webm' });
 
         try {
-          // Flush the final per-device audio chunk to the socket queue.
-          // flush-my-chunks (called by handleEndMeeting after this resolves)
-          // will upload everything to S3. The worker reads VAD scores from
-          // S3 sidecar files — perDeviceAudio is no longer sent in the form.
           await stopMyRecording();
           await new Promise(r => setTimeout(r, 2500));
 
@@ -703,26 +745,47 @@ export default function MeetingRoom({ meetingId, user, meetingName }) {
     } catch (e) { toast.error('Could not start recording: ' + e.message); }
   }, [meetingId, remoteStreams, stopMyRecording]);
 
-  const stopRecording = useCallback(() => { if (mediaRecorderRef.current?.state !== 'inactive') mediaRecorderRef.current?.stop(); socketRef.current?.emit('stop-recording', { meetingId }); setIsRecording(false); toast.success('Recording stopped — uploading...'); }, [meetingId]);
+  const stopRecording = useCallback(() => {
+    if (mediaRecorderRef.current?.state !== 'inactive') mediaRecorderRef.current?.stop();
+    socketRef.current?.emit('stop-recording', { meetingId });
+    setIsRecording(false);
+    toast.success('Recording stopped — uploading...');
+  }, [meetingId]);
 
-  // FIX B: leaveMeeting must be async and await stopMyRecording() so the final
-  // buffered chunk is emitted to the socket before cleanup() closes it.
-  // Previously it was synchronous — stopMyRecording() returned a Promise that
-  // was never awaited, so the final emit was dropped on fast navigations.
+  // ── leaveMeeting ──────────────────────────────────────────────────────────
+  // FIX (Issue 3): Non-host participant leaving.
+  //
+  // Correct ordering:
+  //   1. stopMyRecording() — flush final buffered chunk to socket (awaited)
+  //   2. flush-my-chunks  — server uploads chunks + VAD scores to S3
+  //   3. wait 2s          — give server time to finish background VAD + S3 write
+  //   4. cleanup()        — stops tracks, destroys peers, POST /leave
+  //   5. navigate         — safe to navigate now that socket is done
+  //
+  // Previously this was not async so stopMyRecording was fire-and-forget,
+  // meaning the final chunk was frequently dropped on fast navigations.
+  // flush-my-chunks was also missing entirely for non-host participants.
   const leaveMeeting = useCallback(async () => {
     await stopMyRecording();
+    if (socketRef.current?.connected) {
+      socketRef.current.emit('flush-my-chunks', { meetingId });
+      await new Promise(r => setTimeout(r, 2000));
+    }
     cleanup();
     router.push('/meetings/history');
-  }, [stopMyRecording]);
+  }, [meetingId, stopMyRecording, cleanup]);
 
+  // ── handleEndMeeting ──────────────────────────────────────────────────────
+  // Host ends the meeting for everyone.
+  //
+  // isEndingRef blocks the 'meeting-ended' socket handler from racing with
+  // this function — the host receives its own broadcast too.
   const handleEndMeeting = useCallback(async () => {
     if (!isHost || isEndingRef.current) return;
-    isEndingRef.current = true; // block meeting-ended socket handler from racing
+    isEndingRef.current = true;
     setIsEndingMeeting(true);
     try {
       await api.post(`/meetings/${meetingId}/end`);
-      // Backend now broadcasts meeting-ended to all sockets (incl. host).
-      // isEndingRef prevents the socket handler from running concurrently.
 
       if (isRecording && mediaRecorderRef.current?.state !== 'inactive') {
         toast.loading('Saving recording...', { id: 'end-meeting' });
@@ -740,25 +803,26 @@ export default function MeetingRoom({ meetingId, user, meetingName }) {
       } else {
         await stopMyRecording();
       }
-      // Flush host's per-device audio to S3 before worker processes the meeting.
+
+      // Flush host's per-device audio chunks to S3 before worker processes
       if (socketRef.current?.connected) {
         socketRef.current.emit('flush-my-chunks', { meetingId });
         await new Promise(r => setTimeout(r, 2000));
       }
+
       toast.success('Meeting ended');
       cleanup();
       router.push(`/meetings/${meetingId}`);
     } catch (e) {
-      isEndingRef.current = false; // allow retry on error
+      isEndingRef.current = false; // allow retry
       toast.error(e?.response?.data?.message || 'Failed to end meeting');
       setIsEndingMeeting(false);
     }
-  }, [isHost, isRecording, meetingId, stopMyRecording]);
+  }, [isHost, isRecording, meetingId, stopMyRecording, cleanup]);
 
   const remoteEntries = Object.entries(remoteStreams);
   const totalParticipants = remoteEntries.length + 1;
 
-  // Auto-switch to tile view if few participants, unless manually set or pinned
   useEffect(() => {
     if (!pinnedUserId && totalParticipants <= 4) {
       setLayoutMode('tile');
@@ -790,7 +854,7 @@ export default function MeetingRoom({ meetingId, user, meetingName }) {
 
   const shouldZoom = !pinnedUserId && totalParticipants > 1 && activeSpeakerId !== null;
   const zoomedId = shouldZoom ? activeSpeakerId : null;
-  const spotlightId = pinnedUserId || zoomedId || 'local'; // Default to local in stage view if nobody speaking
+  const spotlightId = pinnedUserId || zoomedId || 'local';
 
   const controlsProps = { isAudioEnabled, isVideoEnabled, isScreenSharing, isMobile, isHandRaised, isRecording, isHost, isEndingMeeting, toggleAudio, toggleVideo, toggleScreenShare, toggleHand, startRecording, stopRecording, handleEndMeeting, leaveMeeting, triggerReaction: triggerReactionEvent, layoutMode, toggleLayout: () => setLayoutMode(p => p === 'stage' ? 'tile' : 'stage') };
   const remoteProps = (uid) => ({ isMuted: participantMediaState[uid]?.audio === false, isCameraOff: participantMediaState[uid]?.video === false });
@@ -816,14 +880,13 @@ export default function MeetingRoom({ meetingId, user, meetingName }) {
         </div>
       )}
 
-      {/* Jitsi Style Top Bar */}
+      {/* Top Bar */}
       <header className="absolute top-0 left-0 right-0 h-14 flex items-center justify-between px-3 md:px-6 z-40 bg-black/60 transition-opacity duration-300">
         <div className="flex items-center gap-2 md:gap-4 pointer-events-auto">
           <div className="text-white font-bold text-xl tracking-tighter flex items-center gap-2">
             <div className="w-8 h-8 rounded-sm bg-[#00E676] flex items-center justify-center text-black text-lg shrink-0">O</div>
           </div>
           <h1 className="font-medium text-white/90 text-sm max-w-[140px] sm:max-w-[200px] md:max-w-md truncate">{meetingName || 'Meeting'}</h1>
-
           <div className="flex items-center gap-2 text-xs font-medium bg-black/40 px-2 py-1 rounded">
             {elapsedTime}
           </div>
@@ -836,11 +899,9 @@ export default function MeetingRoom({ meetingId, user, meetingName }) {
             </div>
           )}
           {networkWarning && (<div className="flex items-center gap-1 text-amber-500 text-xs bg-black/40 px-2 py-1 rounded"><WifiOff className="h-3 w-3" /> Unstable</div>)}
-
           <div className="flex items-center gap-1.5 text-white/80 text-xs font-medium bg-black/40 px-2 py-1 rounded">
             <Users className="h-3 w-3" /> {totalParticipants}
           </div>
-
           <button onClick={() => setChatOpen(p => !p)} className={cn('relative p-1.5 rounded transition-colors', chatOpen ? 'bg-white/20 text-white' : 'bg-black/40 text-white/80 hover:bg-black/60')}>
             <MessageSquare className="h-4 w-4" />
             {unreadCount > 0 && (<span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] w-3.5 h-3.5 rounded-full flex items-center justify-center font-bold shadow-sm">{unreadCount > 9 ? '9+' : unreadCount}</span>)}
@@ -856,7 +917,6 @@ export default function MeetingRoom({ meetingId, user, meetingName }) {
 
       {/* Main Content Area */}
       <div className="flex-1 min-h-0 flex overflow-hidden relative pt-12 pb-24">
-        {/* Always visible REC indicator at top left of video area */}
         {isRecording && (
           <div className="absolute top-16 left-6 z-40 pointer-events-none">
             <Badge className="bg-red-500 text-white border border-red-600 flex items-center gap-1.5 animate-pulse shadow-lg px-2 py-1 text-xs font-bold">
@@ -866,10 +926,8 @@ export default function MeetingRoom({ meetingId, user, meetingName }) {
         )}
 
         <div className="flex-1 min-w-0 overflow-hidden transition-all duration-200 h-full flex flex-col relative">
-
           {layoutMode === 'stage' ? (
             <div className="flex flex-col md:flex-row h-full w-full">
-              {/* Stage Video */}
               <div className="flex-1 min-w-0 min-h-0 flex items-center justify-center p-3 relative">
                 <div className="w-full h-full max-w-[1280px] aspect-video">
                   {spotlightId === 'local' ? (
@@ -879,8 +937,6 @@ export default function MeetingRoom({ meetingId, user, meetingName }) {
                   )}
                 </div>
               </div>
-
-              {/* Vertical Filmstrip */}
               <div className={cn("transition-all duration-300", isMobile ? "jitsi-horizontal-filmstrip h-[120px]" : "jitsi-vertical-filmstrip w-[220px]")}>
                 {spotlightId !== 'local' && (
                   <div className="shrink-0 aspect-video w-full max-w-[200px] mx-auto">
@@ -895,7 +951,6 @@ export default function MeetingRoom({ meetingId, user, meetingName }) {
               </div>
             </div>
           ) : (
-            /* Tile View */
             <div className="jitsi-tile-grid overflow-y-auto custom-scrollbar content-center justify-items-center">
               <div className="w-full max-w-sm md:max-w-md lg:max-w-lg aspect-video shrink-0">
                 <LocalTile videoRef={setLocalVideoRef} name={myName} role={getParticipantRole('local')} isHost={isHost} isAudioEnabled={isAudioEnabled} isVideoEnabled={isVideoEnabled} isScreenSharing={isScreenSharing} isHandRaised={raisedHands.has(myId)} isPinned={pinnedUserId === 'local'} onPin={() => setPinnedUserId(p => p === 'local' ? null : 'local')} onFullscreen={() => handleFullscreen('local')} gallery stream={localStreamRef.current} audioEnabled={isAudioEnabled} isActiveSpeaker={activeSpeakerId === myId} audioLevel={ringLevels[myId] || 0} onAudioLevel={lvl => handleAudioLevel(myId, lvl)} />
@@ -909,7 +964,7 @@ export default function MeetingRoom({ meetingId, user, meetingName }) {
           )}
         </div>
 
-        {/* Chat Panel - Google Meet Style */}
+        {/* Chat Panel */}
         {chatOpen && (
           <div className={cn(
             "bg-white flex flex-col z-50 transition-all duration-300 rounded-xl overflow-hidden shadow-xl border border-black/10 text-black mx-4 my-2",
@@ -921,12 +976,10 @@ export default function MeetingRoom({ meetingId, user, meetingName }) {
                 <X className="h-4 w-4" />
               </button>
             </div>
-
             <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4 custom-scrollbar bg-white">
               <div className="text-xs text-center text-gray-500 bg-gray-100/50 py-2 rounded-lg mb-4">
                 Messages can only be seen by people in the call and are deleted when the call ends.
               </div>
-
               {messages.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full opacity-50 py-8">
                   <MessageSquare className="h-8 w-8 mb-2" />
@@ -951,7 +1004,6 @@ export default function MeetingRoom({ meetingId, user, meetingName }) {
               })}
               <div ref={chatBottomRef} />
             </div>
-
             <form onSubmit={e => { e.preventDefault(); const message = chatInput.trim(); if (!message || !socketRef.current) return; setMessages(prev => [...prev, { id: Date.now(), userId: myId, userName: myName, message, timestamp: new Date().toISOString(), isOwn: true }]); socketRef.current.emit('chat-message', { meetingId, message }); setChatInput(''); }} className="p-4 shrink-0 bg-white">
               <div className="relative flex items-center bg-gray-100 border border-transparent rounded-full overflow-hidden focus-within:border-blue-500/30 focus-within:bg-white focus-within:shadow-sm transition-all px-2">
                 <input type="text" value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder="Send a message to everyone" className="flex-1 bg-transparent px-3 py-2.5 text-sm text-black placeholder:text-gray-500 focus:outline-none" />
@@ -974,14 +1026,9 @@ function LocalTile({ videoRef, name, role, isHost, isAudioEnabled, isVideoEnable
   const initials = name.split(' ').map(n => n[0] || '').join('').slice(0, 2).toUpperCase() || 'Y';
 
   return (
-    <div className={cn(
-      'jitsi-video-tile h-full w-full flex items-center justify-center group relative',
-      isHandRaised && 'jitsi-hand-raised',
-      isActiveSpeaker && 'speaker-active'
-    )}>
+    <div className={cn('jitsi-video-tile h-full w-full flex items-center justify-center group relative', isHandRaised && 'jitsi-hand-raised', isActiveSpeaker && 'speaker-active')}>
       <SpeakerRing isActive={isActiveSpeaker} level={audioLevel} thumbnail={thumbnail} />
       <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover" />
-
       {!isVideoEnabled && (
         <div className="absolute inset-0 flex items-center justify-center bg-black">
           <div className="w-24 h-24 rounded-full bg-[#333] flex items-center justify-center border border-white/5">
@@ -989,20 +1036,15 @@ function LocalTile({ videoRef, name, role, isHost, isAudioEnabled, isVideoEnable
           </div>
         </div>
       )}
-
-      {/* Jitsi Hover Controls */}
       <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
         <div className="absolute top-2 right-2 flex gap-1 pointer-events-auto">
           <TileBtn onClick={onPin} title={isPinned ? 'Unpin' : 'Pin'}>{isPinned ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}</TileBtn>
           {!thumbnail && <TileBtn onClick={onFullscreen} title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}>{isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}</TileBtn>}
         </div>
       </div>
-
-      {/* Jitsi Indicators */}
       <div className="jitsi-top-indicators">
         {!isAudioEnabled && <div className="jitsi-indicator-icon text-red-500"><MicOff className="h-3 w-3" /></div>}
       </div>
-
       <div className="jitsi-name-badge flex flex-col items-start px-3 py-1.5 bg-black/60 backdrop-blur-md rounded-lg mb-2 ml-2">
         <span className="truncate text-sm font-semibold">{name} {isScreenSharing ? '(Screen)' : ''}</span>
         {role && <span className="text-[10px] text-white/70 uppercase tracking-wider">{role}</span>}
@@ -1025,14 +1067,9 @@ function RemoteTile({ userId, stream, name, role, isMuted, isCameraOff, isHandRa
   const showCameraOff = isCameraOff || !hasVideo;
 
   return (
-    <div className={cn(
-      'jitsi-video-tile h-full w-full flex items-center justify-center group relative',
-      isHandRaised && 'jitsi-hand-raised',
-      isActiveSpeaker && 'speaker-active'
-    )}>
+    <div className={cn('jitsi-video-tile h-full w-full flex items-center justify-center group relative', isHandRaised && 'jitsi-hand-raised', isActiveSpeaker && 'speaker-active')}>
       <SpeakerRing isActive={isActiveSpeaker} level={audioLevel} thumbnail={thumbnail} />
       <video ref={videoRef} autoPlay playsInline className={cn('w-full h-full object-cover', showCameraOff && 'hidden')} />
-
       {showCameraOff && (
         <div className="absolute inset-0 flex items-center justify-center bg-black">
           <div className="w-24 h-24 rounded-full bg-[#333] flex items-center justify-center border border-white/5">
@@ -1040,20 +1077,15 @@ function RemoteTile({ userId, stream, name, role, isMuted, isCameraOff, isHandRa
           </div>
         </div>
       )}
-
-      {/* Jitsi Hover Controls */}
       <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
         <div className="absolute top-2 right-2 flex gap-1 pointer-events-auto">
           <TileBtn onClick={onPin} title={isPinned ? 'Unpin' : 'Pin'}>{isPinned ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}</TileBtn>
           {!thumbnail && <TileBtn onClick={onFullscreen} title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}>{isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}</TileBtn>}
         </div>
       </div>
-
-      {/* Jitsi Indicators */}
       <div className="jitsi-top-indicators">
         {isMuted && <div className="jitsi-indicator-icon text-red-500"><MicOff className="h-3 w-3" /></div>}
       </div>
-
       <div className="jitsi-name-badge flex flex-col items-start px-3 py-1.5 bg-black/60 backdrop-blur-md rounded-lg mb-2 ml-2">
         <span className="truncate text-sm font-semibold">{name}</span>
         {role && <span className="text-[10px] text-white/70 uppercase tracking-wider">{role}</span>}
