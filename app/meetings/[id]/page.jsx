@@ -546,22 +546,22 @@ export default function MeetingDetailPage({ params }) {
           <Card className="bg-card border-muted"><CardContent className="flex items-center gap-3 py-4"><Mic className="h-5 w-5 text-muted-foreground" /><div><p className="text-sm text-muted-foreground">Type</p><Badge className={getDomainColor(meeting.domain)}>{meeting.domain}</Badge></div></CardContent></Card>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-6">
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-              <TabsList className="bg-card border border-muted">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
+          <div className="lg:col-span-2 flex flex-col">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col space-y-4">
+              <TabsList className="bg-card border border-muted shrink-0">
                 <TabsTrigger value="summary">Summary</TabsTrigger>
                 <TabsTrigger value="transcript">Transcript</TabsTrigger>
                 <TabsTrigger value="attendees">Attendees</TabsTrigger>
                 <TabsTrigger value="action-items">Action Items</TabsTrigger>
               </TabsList>
 
-              <TabsContent value="summary">
+              <TabsContent value="summary" className="flex-1">
                 <MeetingSummaryPanel meeting={meeting} isProcessing={isProcessing} />
               </TabsContent>
 
-              <TabsContent value="transcript">
-                <Card className="bg-card border-muted">
+              <TabsContent value="transcript" className="flex-1 flex flex-col">
+                <Card className="bg-card border-muted flex-1 flex flex-col">
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <CardTitle>Transcript</CardTitle>
@@ -573,11 +573,11 @@ export default function MeetingDetailPage({ params }) {
                       )}
                     </div>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="flex-1 flex flex-col">
                     {transcriptSegments.length > 0 ? (
-                      <div className="space-y-2">
-                        <p className="text-xs text-muted-foreground mb-3">AI has assigned speakers. Click any name to correct it.</p>
-                        <ScrollArea className="h-[400px]">
+                      <div className="flex-1 flex flex-col space-y-2">
+                        <p className="text-xs text-muted-foreground mb-3 shrink-0">AI has assigned speakers. Click any name to correct it.</p>
+                        <ScrollArea className="flex-1 min-h-[500px]">
                           <div className="space-y-3 pr-2">
                             {(() => {
                               const groups = [];
@@ -638,7 +638,7 @@ export default function MeetingDetailPage({ params }) {
                         </ScrollArea>
                       </div>
                     ) : meeting?.transcriptRaw ? (
-                      <ScrollArea className="h-[400px]">
+                      <ScrollArea className="flex-1 min-h-[500px]">
                         <div className="p-3 bg-muted/50 rounded-lg">
                           <p className="text-xs text-muted-foreground mb-2">Speaker detection not available — showing raw transcript.</p>
                           <p className="text-foreground whitespace-pre-wrap text-sm">{meeting.transcriptRaw}</p>
@@ -651,10 +651,10 @@ export default function MeetingDetailPage({ params }) {
                 </Card>
               </TabsContent>
 
-              <TabsContent value="attendees">
-                <Card className="bg-card border-muted">
+              <TabsContent value="attendees" className="flex-1 flex flex-col">
+                <Card className="bg-card border-muted flex-1">
                   <CardHeader><CardTitle>Attendees</CardTitle></CardHeader>
-                  <CardContent>
+                  <CardContent className="flex-1">
                     <div className="space-y-4">
                       {meeting.attendees?.map((attendee) => (
                         <AttendeeContributionCard key={attendee.user?._id || attendee._id} attendee={attendee} contributions={meeting.attendeeContributions} />
@@ -664,10 +664,10 @@ export default function MeetingDetailPage({ params }) {
                 </Card>
               </TabsContent>
 
-              <TabsContent value="action-items">
-                <Card className="bg-card border-muted">
+              <TabsContent value="action-items" className="flex-1 flex flex-col">
+                <Card className="bg-card border-muted flex-1">
                   <CardHeader><CardTitle className="flex items-center gap-2"><CheckSquare className="h-5 w-5" />Action Items</CardTitle></CardHeader>
-                  <CardContent>
+                  <CardContent className="flex-1">
                     {meeting.actionItems?.length > 0 ? (
                       <div className="space-y-3">
                         {meeting.actionItems.map((item, i) => (

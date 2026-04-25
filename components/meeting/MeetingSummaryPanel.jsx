@@ -6,10 +6,10 @@ export default function MeetingSummaryPanel({ meeting, isProcessing }) {
   if (!meeting) return null;
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="space-y-6 animate-in fade-in duration-500 flex flex-col h-full">
       
       {/* Executive Summary */}
-      <Card className="bg-surface border-border card-elevated overflow-hidden relative">
+      <Card className="bg-surface border-border card-elevated overflow-hidden relative shrink-0">
         <div className="absolute top-0 left-0 w-1 h-full bg-primary" />
         <CardHeader className="pb-3 pt-5 px-6">
           <CardTitle className="flex items-center gap-2 text-lg">
@@ -41,7 +41,7 @@ export default function MeetingSummaryPanel({ meeting, isProcessing }) {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1">
         
         {/* Key Conclusions */}
         <Card className="bg-surface border-border card-elevated h-full">

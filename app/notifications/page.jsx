@@ -11,6 +11,7 @@ import { format } from 'date-fns';
 import api from '@/lib/axios';
 import { ListSkeleton } from '@/components/shared/Skeleton';
 import ConfirmModal from '@/components/shared/ConfirmModal';
+import useNotificationStore from '@/store/notificationStore';
 import toast from 'react-hot-toast';
 
 const notificationIcons = {
@@ -33,61 +34,29 @@ const notificationColors = {
 
 export default function NotificationsPage() {
   const router = useRouter();
-  const [notifications, setNotifications] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { 
+    notifications, 
+    unreadCount, 
+    isLoading, 
+    fetchNotifications, 
+    markAsRead, 
+    markAllAsRead, 
+    deleteNotification: deleteNotif 
+  } = useNotificationStore();
+
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [selectedNotification, setSelectedNotification] = useState(null);
 
   useEffect(() => {
     fetchNotifications();
-  }, []);
-
-  const fetchNotifications = async () => {
-    try {
-      const response = await api.get('/notifications');
-      setNotifications(response.data.notifications || []);
-    } catch (error) {
-      console.error('Failed to fetch notifications:', error);
-      toast.error('Failed to fetch notifications');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const markAsRead = async (id) => {
-    try {
-      await api.put(`/notifications/${id}/read`);
-      setNotifications(prev => prev.map(n =>
-        n._id === id ? { ...n, read: true } : n
-      ));
-      toast.success('Marked as read');
-    } catch (error) {
-      toast.error('Failed to mark as read');
-    }
-  };
-
-  const markAllAsRead = async () => {
-    try {
-      await api.put('/notifications/read-all');
-      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-      toast.success('All notifications marked as read');
-    } catch (error) {
-      toast.error('Failed to mark all as read');
-    }
-  };
+  }, [fetchNotifications]);
 
   const deleteNotification = async () => {
     if (!selectedNotification) return;
-    try {
-      await api.delete(`/notifications/${selectedNotification._id}`);
-      setNotifications(prev => prev.filter(n => n._id !== selectedNotification._id));
-      toast.success('Notification deleted');
-    } catch (error) {
-      toast.error('Failed to delete notification');
-    } finally {
-      setDeleteModalOpen(false);
-      setSelectedNotification(null);
-    }
+    await deleteNotif(selectedNotification._id);
+    setDeleteModalOpen(false);
+    setSelectedNotification(null);
+    toast.success('Notification deleted');
   };
 
   const confirmDelete = (notification) => {
@@ -146,8 +115,6 @@ export default function NotificationsPage() {
       router.push('/recommendations');
     }
   };
-
-  const unreadCount = notifications.filter(n => !n.read).length;
 
   if (isLoading) {
     return (

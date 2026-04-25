@@ -22,6 +22,12 @@ const useNotificationStore = create((set, get) => ({
   },
 
   markAsRead: async (id) => {
+    const { notifications, unreadCount } = get();
+    const notification = notifications.find((n) => n._id === id);
+    
+    // If not found or already read, don't do anything
+    if (!notification || notification.read) return;
+
     try {
       await api.put(`/notifications/${id}/read`);
       set((state) => ({

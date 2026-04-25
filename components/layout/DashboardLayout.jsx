@@ -266,7 +266,7 @@ export default function DashboardLayout({ children }) {
 
               <Link href="/notifications" className="relative group/bell">
                 <Button variant="ghost" size="icon" className="text-muted-foreground group-hover/bell:bg-surface-hover group-hover/bell:text-foreground rounded-full h-9 w-9 transition-colors">
-                  <Bell className="h=[18px] w-[18px]" strokeWidth={1.5} />
+                  <Bell className="h-[18px] w-[18px]" strokeWidth={1.5} />
                   {unreadCount > 0 && (
                     <span className="absolute top-0 right-0 h-4 w-4 rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground flex items-center justify-center shadow-sm border border-background">
                       {unreadCount > 99 ? '99+' : unreadCount}
