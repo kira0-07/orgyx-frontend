@@ -207,710 +207,729 @@ function ControlsBar({ isAudioEnabled, isVideoEnabled, isScreenSharing, isMobile
 }
 
 export default function MeetingRoom({ meetingId, user, meetingName }) {
-  const router = useRouter();
-  const socketRef = useRef(null), localVideoRef = useRef(null), localStreamRef = useRef(null), peersRef = useRef({});
-  const mediaRecorderRef = useRef(null), myRecorderRef = useRef(null), recordingChunksRef = useRef([]);
-  const myChunksRef = useRef([]), chunkIntervalRef = useRef(null), chatBottomRef = useRef(null), fullscreenContainerRef = useRef(null);
-  const myRecordingStartTimeRef = useRef(null), audioLevelsRef = useRef({});
-  const initSegmentRef = useRef(null);
-  const isEndingRef = useRef(false);      // guard: host is running handleEndMeeting — skip meeting-ended socket handler
+const router = useRouter();
+const socketRef = useRef(null), localVideoRef = useRef(null), localStreamRef = useRef(null), peersRef = useRef({});
+const mediaRecorderRef = useRef(null), myRecorderRef = useRef(null), recordingChunksRef = useRef([]);
+const myChunksRef = useRef([]), chunkIntervalRef = useRef(null), chatBottomRef = useRef(null), fullscreenContainerRef = useRef(null);
+const myRecordingStartTimeRef = useRef(null), audioLevelsRef = useRef({});
+const initSegmentRef = useRef(null);
+const isEndingRef = useRef(false);      // guard: host is running handleEndMeeting — skip meeting-ended socket handler
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // FIX (Issue 3): hasCleanedUpRef prevents cleanup() running more than once.
-  //
-  // Three call paths all converge on cleanup() within milliseconds of each
-  // other when a meeting ends:
-  //   1. leaveMeeting()         — user clicks Leave
-  //   2. 'meeting-ended' handler — host ends meeting, socket event fires
-  //   3. useEffect return        — component unmounts after navigation
-  //
-  // Without this guard all three fire POST /leave simultaneously (visible as
-  // 3× /leave requests with identical timestamps in the server logs).
-  //
-  // useRef is the correct choice here — it persists across renders and
-  // mutations are synchronous (unlike setState which is async and would allow
-  // a second caller to slip through before the state update commits).
-  // ─────────────────────────────────────────────────────────────────────────
-  const hasCleanedUpRef = useRef(false);
+// ─────────────────────────────────────────────────────────────────────────
+// FIX (Issue 3): hasCleanedUpRef prevents cleanup() running more than once.
+//
+// Three call paths all converge on cleanup() within milliseconds of each
+// other when a meeting ends:
+//   1. leaveMeeting()         — user clicks Leave
+//   2. 'meeting-ended' handler — host ends meeting, socket event fires
+//   3. useEffect return        — component unmounts after navigation
+//
+// Without this guard all three fire POST /leave simultaneously (visible as
+// 3× /leave requests with identical timestamps in the server logs).
+//
+// useRef is the correct choice here — it persists across renders and
+// mutations are synchronous (unlike setState which is async and would allow
+// a second caller to slip through before the state update commits).
+// ─────────────────────────────────────────────────────────────────────────
+const hasCleanedUpRef = useRef(false);
 
-  const [networkWarning, setNetworkWarning] = useState(false);
-  const networkWarningTimerRef = useRef(null);
-  const lastPeerActivityRef = useRef(Date.now());
+const [networkWarning, setNetworkWarning] = useState(false);
+const networkWarningTimerRef = useRef(null);
+const lastPeerActivityRef = useRef(Date.now());
 
-  const [ringLevels, setRingLevels] = useState({});
-  const activeSpeakerId = useActiveSpeaker(audioLevelsRef);
-  const [participantNames, setParticipantNames] = useState({});
-  const [remoteStreams, setRemoteStreams] = useState({});
-  const [isAudioEnabled, setIsAudioEnabled] = useState(true);
-  const [isVideoEnabled, setIsVideoEnabled] = useState(true);
-  const [isScreenSharing, setIsScreenSharing] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
-  const [isHandRaised, setIsHandRaised] = useState(false);
-  const [raisedHands, setRaisedHands] = useState(new Set());
-  const [chatOpen, setChatOpen] = useState(false);
-  const [messages, setMessages] = useState([]);
-  const [chatInput, setChatInput] = useState('');
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [isConnecting, setIsConnecting] = useState(true);
-  const [isHost, setIsHost] = useState(false);
-  const [isEndingMeeting, setIsEndingMeeting] = useState(false);
-  const isUploadingRef = useRef(false);
-  const [pinnedUserId, setPinnedUserId] = useState(null);
-  const [fullscreenUserId, setFullscreenUserId] = useState(null);
-  const [meetingCancelled, setMeetingCancelled] = useState(false);
-  const [meetingEndedOverlay, setMeetingEndedOverlay] = useState(false);
-  const [isNativeFullscreen, setIsNativeFullscreen] = useState(false);
-  const [isMyRecording, setIsMyRecording] = useState(false);
-  const [participantMediaState, setParticipantMediaState] = useState({});
-  const [theme, setTheme] = useState('dark');
-  const [reactions, setReactions] = useState([]);
-  const [layoutMode, setLayoutMode] = useState('stage');
-  const [meetingStartTime] = useState(Date.now());
-  const [elapsedTime, setElapsedTime] = useState('00:00');
+const [ringLevels, setRingLevels] = useState({});
+const activeSpeakerId = useActiveSpeaker(audioLevelsRef);
+const [participantNames, setParticipantNames] = useState({});
+const [participantNetworkStatus, setParticipantNetworkStatus] = useState({});
+const [remoteStreams, setRemoteStreams] = useState({});
+const [isAudioEnabled, setIsAudioEnabled] = useState(true);
+const [isVideoEnabled, setIsVideoEnabled] = useState(true);
+const [isScreenSharing, setIsScreenSharing] = useState(false);
+const [isRecording, setIsRecording] = useState(false);
+const [isHandRaised, setIsHandRaised] = useState(false);
+const [raisedHands, setRaisedHands] = useState(new Set());
+const [chatOpen, setChatOpen] = useState(false);
+const [attendeesOpen, setAttendeesOpen] = useState(false);
+const [messages, setMessages] = useState([]);
+const [chatInput, setChatInput] = useState('');
+const [unreadCount, setUnreadCount] = useState(0);
+const [isConnecting, setIsConnecting] = useState(true);
+const [isHost, setIsHost] = useState(false);
+const [isEndingMeeting, setIsEndingMeeting] = useState(false);
+const isUploadingRef = useRef(false);
+const [pinnedUserId, setPinnedUserId] = useState(null);
+const [fullscreenUserId, setFullscreenUserId] = useState(null);
+const [meetingCancelled, setMeetingCancelled] = useState(false);
+const [meetingEndedOverlay, setMeetingEndedOverlay] = useState(false);
+const [isNativeFullscreen, setIsNativeFullscreen] = useState(false);
+const [isMyRecording, setIsMyRecording] = useState(false);
+const [participantMediaState, setParticipantMediaState] = useState({});
+const [theme, setTheme] = useState('dark');
+const [reactions, setReactions] = useState([]);
+const [layoutMode, setLayoutMode] = useState('stage');
+const [meetingStartTime] = useState(Date.now());
+const [elapsedTime, setElapsedTime] = useState('00:00');
 
-  useEffect(() => {
-    const timer = setInterval(() => {
-      const diff = Math.floor((Date.now() - meetingStartTime) / 1000);
-      const m = Math.floor(diff / 60).toString().padStart(2, '0');
-      const s = (diff % 60).toString().padStart(2, '0');
-      setElapsedTime(`${m}:${s}`);
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [meetingStartTime]);
+useEffect(() => {
+  const timer = setInterval(() => {
+    const diff = Math.floor((Date.now() - meetingStartTime) / 1000);
+    const m = Math.floor(diff / 60).toString().padStart(2, '0');
+    const s = (diff % 60).toString().padStart(2, '0');
+    setElapsedTime(`${m}:${s}`);
+  }, 1000);
+  return () => clearInterval(timer);
+}, [meetingStartTime]);
 
-  const isMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-  const myId = (user?._id || user?.id)?.toString();
-  const myName = user?.firstName ? `${user.firstName} ${user.lastName}` : 'You';
+const isMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+const myId = (user?._id || user?.id)?.toString();
+const myName = user?.firstName ? `${user.firstName} ${user.lastName}` : 'You';
 
-  useEffect(() => {
-    if (typeof document !== 'undefined') {
-      setTheme(document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+useEffect(() => {
+  if (typeof document !== 'undefined') {
+    setTheme(document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+  }
+}, []);
+
+const toggleTheme = () => {
+  const newTheme = theme === 'dark' ? 'light' : 'dark';
+  document.documentElement.classList.toggle('dark');
+  localStorage.setItem('theme', newTheme);
+  setTheme(newTheme);
+};
+
+const triggerReactionEvent = (emoji) => {
+  if (!socketRef.current) return;
+  const reactionId = Date.now() + Math.random();
+  setReactions(prev => [...prev, { id: reactionId, emoji, left: Math.random() * 80 + 10 }]);
+  setTimeout(() => setReactions(prev => prev.filter(r => r.id !== reactionId)), 3000);
+  socketRef.current.emit('chat-message', { meetingId, message: `EMOJI_REACTION:${emoji}` });
+};
+
+const handleAudioLevel = useCallback((id, level) => {
+  audioLevelsRef.current[id] = level;
+  if (id !== myId && level > 0.02) lastPeerActivityRef.current = Date.now();
+  setRingLevels(prev => { if (Math.abs((prev[id] || 0) - level) < 0.015) return prev; return { ...prev, [id]: level }; });
+}, [myId]);
+
+useEffect(() => {
+  const interval = setInterval(() => {
+    const hasPeers = Object.keys(peersRef.current).length > 0;
+    if (!hasPeers) return;
+    if (Date.now() - lastPeerActivityRef.current > 15000) {
+      setNetworkWarning(true);
     }
-  }, []);
+  }, 5000);
+  return () => clearInterval(interval);
+}, []);
 
-  const toggleTheme = () => {
-    const newTheme = theme === 'dark' ? 'light' : 'dark';
-    document.documentElement.classList.toggle('dark');
-    localStorage.setItem('theme', newTheme);
-    setTheme(newTheme);
-  };
+const fetchParticipantNames = useCallback(async () => {
+  try {
+    const res = await api.get(`/meetings/${meetingId}`);
+    const nameMap = {};
+    (res.data.meeting?.attendees || []).forEach(a => { const u = a.user; if (u?._id) nameMap[u._id.toString()] = { fullName: `${u.firstName} ${u.lastName}`, role: u.role }; });
+    setParticipantNames(nameMap);
+  } catch (e) { console.warn('Could not fetch participant names'); }
+}, [meetingId]);
 
-  const triggerReactionEvent = (emoji) => {
-    if (!socketRef.current) return;
-    const reactionId = Date.now() + Math.random();
-    setReactions(prev => [...prev, { id: reactionId, emoji, left: Math.random() * 80 + 10 }]);
-    setTimeout(() => setReactions(prev => prev.filter(r => r.id !== reactionId)), 3000);
-    socketRef.current.emit('chat-message', { meetingId, message: `EMOJI_REACTION:${emoji}` });
-  };
+const getParticipantName = useCallback((userId) => {
+  if (!userId) return 'Participant';
+  const id = userId.toString();
+  if (id === myId) return myName;
+  return participantNames[id]?.fullName || 'Participant';
+}, [participantNames, myId, myName]);
 
-  const handleAudioLevel = useCallback((id, level) => {
-    audioLevelsRef.current[id] = level;
-    if (id !== myId && level > 0.02) lastPeerActivityRef.current = Date.now();
-    setRingLevels(prev => { if (Math.abs((prev[id] || 0) - level) < 0.015) return prev; return { ...prev, [id]: level }; });
-  }, [myId]);
+const getParticipantRole = useCallback((userId) => {
+  if (!userId) return '';
+  const id = userId.toString();
+  if (id === myId) return user?.role || '';
+  return participantNames[id]?.role || '';
+}, [participantNames, myId, user]);
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const hasPeers = Object.keys(peersRef.current).length > 0;
-      if (!hasPeers) return;
-      if (Date.now() - lastPeerActivityRef.current > 15000) {
-        setNetworkWarning(true);
+const setLocalVideoRef = useCallback((el) => { localVideoRef.current = el; if (el && localStreamRef.current) el.srcObject = localStreamRef.current; }, []);
+
+const broadcastMediaState = useCallback((audio, video) => {
+  socketRef.current?.emit('media-state', { meetingId, audio, video });
+}, [meetingId]);
+
+useEffect(() => {
+  const onChange = () => setIsNativeFullscreen(!!document.fullscreenElement);
+  document.addEventListener('fullscreenchange', onChange);
+  return () => document.removeEventListener('fullscreenchange', onChange);
+}, []);
+
+const handleFullscreen = useCallback((userId) => {
+  if (fullscreenUserId === userId && isNativeFullscreen) { document.exitFullscreen().catch(() => { }); setFullscreenUserId(null); }
+  else { setFullscreenUserId(userId); setTimeout(() => { fullscreenContainerRef.current?.requestFullscreen().catch(e => console.warn('Fullscreen failed:', e.message)); }, 50); }
+}, [fullscreenUserId, isNativeFullscreen]);
+
+const exitFullscreen = useCallback(() => { if (document.fullscreenElement) document.exitFullscreen().catch(() => { }); setFullscreenUserId(null); }, []);
+
+const startMyRecording = useCallback((stream) => {
+  if (!stream) return;
+  if (myRecorderRef.current) {
+    try { if (myRecorderRef.current.state !== 'inactive') myRecorderRef.current.stop(); } catch (_) { }
+    myRecorderRef.current = null;
+  }
+  if (chunkIntervalRef.current) { clearInterval(chunkIntervalRef.current); chunkIntervalRef.current = null; }
+  try {
+    const audioOnly = new MediaStream(stream.getAudioTracks());
+    const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm';
+    const recorder = new MediaRecorder(audioOnly, { mimeType });
+    myChunksRef.current = [];
+    myRecordingStartTimeRef.current = Date.now();
+    initSegmentRef.current = null;
+    recorder.ondataavailable = e => {
+      if (e.data.size > 0) {
+        if (!initSegmentRef.current) {
+          // P1 FIX (initSegment logic): Store blob1 as the init segment header
+          // but do NOT push it into myChunksRef. Previously blob1 was both
+          // stored as initSegment AND pushed to the chunks array, so the first
+          // 1s of audio was duplicated in every subsequent chunk (prepended as
+          // 'header' + present in normal audio data). Now blob1 is only the
+          // prepended header; actual audio starts from blob2 onward.
+          initSegmentRef.current = e.data;
+          return; // skip pushing to myChunksRef
+        }
+        myChunksRef.current.push(e.data);
       }
-    }, 5000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const fetchParticipantNames = useCallback(async () => {
-    try {
-      const res = await api.get(`/meetings/${meetingId}`);
-      const nameMap = {};
-      (res.data.meeting?.attendees || []).forEach(a => { const u = a.user; if (u?._id) nameMap[u._id.toString()] = { fullName: `${u.firstName} ${u.lastName}`, role: u.role }; });
-      setParticipantNames(nameMap);
-    } catch (e) { console.warn('Could not fetch participant names'); }
-  }, [meetingId]);
-
-  const getParticipantName = useCallback((userId) => {
-    if (!userId) return 'Participant';
-    const id = userId.toString();
-    if (id === myId) return myName;
-    return participantNames[id]?.fullName || 'Participant';
-  }, [participantNames, myId, myName]);
-
-  const getParticipantRole = useCallback((userId) => {
-    if (!userId) return '';
-    const id = userId.toString();
-    if (id === myId) return user?.role || '';
-    return participantNames[id]?.role || '';
-  }, [participantNames, myId, user]);
-
-  const setLocalVideoRef = useCallback((el) => { localVideoRef.current = el; if (el && localStreamRef.current) el.srcObject = localStreamRef.current; }, []);
-
-  const broadcastMediaState = useCallback((audio, video) => {
-    socketRef.current?.emit('media-state', { meetingId, audio, video });
-  }, [meetingId]);
-
-  useEffect(() => {
-    const onChange = () => setIsNativeFullscreen(!!document.fullscreenElement);
-    document.addEventListener('fullscreenchange', onChange);
-    return () => document.removeEventListener('fullscreenchange', onChange);
-  }, []);
-
-  const handleFullscreen = useCallback((userId) => {
-    if (fullscreenUserId === userId && isNativeFullscreen) { document.exitFullscreen().catch(() => { }); setFullscreenUserId(null); }
-    else { setFullscreenUserId(userId); setTimeout(() => { fullscreenContainerRef.current?.requestFullscreen().catch(e => console.warn('Fullscreen failed:', e.message)); }, 50); }
-  }, [fullscreenUserId, isNativeFullscreen]);
-
-  const exitFullscreen = useCallback(() => { if (document.fullscreenElement) document.exitFullscreen().catch(() => { }); setFullscreenUserId(null); }, []);
-
-  const startMyRecording = useCallback((stream) => {
-    if (!stream) return;
-    if (myRecorderRef.current) {
-      try { if (myRecorderRef.current.state !== 'inactive') myRecorderRef.current.stop(); } catch (_) { }
-      myRecorderRef.current = null;
-    }
-    if (chunkIntervalRef.current) { clearInterval(chunkIntervalRef.current); chunkIntervalRef.current = null; }
-    try {
-      const audioOnly = new MediaStream(stream.getAudioTracks());
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm';
-      const recorder = new MediaRecorder(audioOnly, { mimeType });
+    };
+    chunkIntervalRef.current = setInterval(() => {
+      if (!myChunksRef.current.length) return;
+      const chunks = [...myChunksRef.current];
       myChunksRef.current = [];
-      myRecordingStartTimeRef.current = Date.now();
-      initSegmentRef.current = null;
-      recorder.ondataavailable = e => {
-        if (e.data.size > 0) {
-          if (!initSegmentRef.current) {
-            // P1 FIX (initSegment logic): Store blob1 as the init segment header
-            // but do NOT push it into myChunksRef. Previously blob1 was both
-            // stored as initSegment AND pushed to the chunks array, so the first
-            // 1s of audio was duplicated in every subsequent chunk (prepended as
-            // 'header' + present in normal audio data). Now blob1 is only the
-            // prepended header; actual audio starts from blob2 onward.
-            initSegmentRef.current = e.data;
-            return; // skip pushing to myChunksRef
-          }
-          myChunksRef.current.push(e.data);
-        }
-      };
-      chunkIntervalRef.current = setInterval(() => {
-        if (!myChunksRef.current.length) return;
-        const chunks = [...myChunksRef.current];
-        myChunksRef.current = [];
-        // P1 FIX: blobChunks always prepends initSegment (since blob1 is no
-        // longer in myChunksRef, there's no duplication risk here).
-        const blobChunks = initSegmentRef.current
-          ? [initSegmentRef.current, ...chunks]
-          : chunks;
-        const blob = new Blob(blobChunks, { type: mimeType });
-        blob.arrayBuffer().then(buf => {
-          socketRef.current?.emit('audio-chunk', {
-            meetingId,
-            audioChunk: buf,
-            timestamp: Date.now(),
-            recordingStartTime: myRecordingStartTimeRef.current
-          });
-        }).catch(e => console.warn('Chunk send failed:', e));
-      }, 10000);
-      recorder.start(1000);
-      myRecorderRef.current = recorder;
-      setIsMyRecording(true);
-    } catch (e) { console.warn('Per-device recording failed:', e.message); }
-  }, [meetingId]);
+      // P1 FIX: blobChunks always prepends initSegment (since blob1 is no
+      // longer in myChunksRef, there's no duplication risk here).
+      const blobChunks = initSegmentRef.current
+        ? [initSegmentRef.current, ...chunks]
+        : chunks;
+      const blob = new Blob(blobChunks, { type: mimeType });
+      blob.arrayBuffer().then(buf => {
+        socketRef.current?.emit('audio-chunk', {
+          meetingId,
+          audioChunk: buf,
+          timestamp: Date.now(),
+          recordingStartTime: myRecordingStartTimeRef.current
+        });
+      }).catch(e => console.warn('Chunk send failed:', e));
+    }, 10000);
+    recorder.start(1000);
+    myRecorderRef.current = recorder;
+    setIsMyRecording(true);
+  } catch (e) { console.warn('Per-device recording failed:', e.message); }
+}, [meetingId]);
 
-  const stopMyRecording = useCallback(async () => {
-    if (chunkIntervalRef.current) { clearInterval(chunkIntervalRef.current); chunkIntervalRef.current = null; }
-    // P1 FIX: Guard now also fires when initSegment exists but myChunksRef is
-    // empty (recording stopped < 1s after start — only the init blob arrived).
-    const hasChunks = myChunksRef.current.length > 0 || initSegmentRef.current;
-    if (hasChunks && myRecorderRef.current) {
-      const mimeType = myRecorderRef.current.mimeType || 'audio/webm';
-      const blob = new Blob(
-        initSegmentRef.current
-          ? [initSegmentRef.current, ...myChunksRef.current]
-          : myChunksRef.current,
-        { type: mimeType }
-      );
-      myChunksRef.current = [];
-      try {
-        const buf = await blob.arrayBuffer();
-        if (socketRef.current?.connected) {
-          socketRef.current.emit('audio-chunk', {
-            meetingId,
-            audioChunk: buf,
-            timestamp: Date.now(),
-            recordingStartTime: myRecordingStartTimeRef.current
-          });
-          await new Promise(r => setTimeout(r, 500));
-        }
-      } catch (_) { }
-    }
-    if (myRecorderRef.current?.state !== 'inactive') myRecorderRef.current?.stop();
-    myRecorderRef.current = null; myRecordingStartTimeRef.current = null; initSegmentRef.current = null; setIsMyRecording(false);
-  }, [meetingId]);
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // cleanup() — tears down media, peers, and socket room membership.
-  //
-  // FIX (Issue 3): hasCleanedUpRef.current guards against this running more
-  // than once. The first caller sets the flag and proceeds; all subsequent
-  // callers (useEffect return, meeting-ended handler, leaveMeeting) return
-  // immediately. This eliminates the 3× simultaneous POST /leave requests.
-  //
-  // Note: stopMyRecording() is intentionally NOT called here. Every call path
-  // that leads to cleanup() is responsible for awaiting stopMyRecording()
-  // first, then emitting flush-my-chunks, then calling cleanup(). This keeps
-  // the ordering correct and avoids a double-stop of the MediaRecorder.
-  // ─────────────────────────────────────────────────────────────────────────
-  const cleanup = useCallback(() => {
-    if (hasCleanedUpRef.current) return;
-    hasCleanedUpRef.current = true;
-
-    localStreamRef.current?.getTracks().forEach(t => t.stop());
-    localStreamRef.current = null;
-    Object.keys(peersRef.current).forEach(uid => {
-      try { peersRef.current[uid]?.destroy(); } catch (_) { }
-      delete peersRef.current[uid];
-    });
-    if (networkWarningTimerRef.current) clearTimeout(networkWarningTimerRef.current);
-
+const stopMyRecording = useCallback(async () => {
+  if (chunkIntervalRef.current) { clearInterval(chunkIntervalRef.current); chunkIntervalRef.current = null; }
+  // P1 FIX: Guard now also fires when initSegment exists but myChunksRef is
+  // empty (recording stopped < 1s after start — only the init blob arrived).
+  const hasChunks = myChunksRef.current.length > 0 || initSegmentRef.current;
+  if (hasChunks && myRecorderRef.current) {
+    const mimeType = myRecorderRef.current.mimeType || 'audio/webm';
+    const blob = new Blob(
+      initSegmentRef.current
+        ? [initSegmentRef.current, ...myChunksRef.current]
+        : myChunksRef.current,
+      { type: mimeType }
+    );
+    myChunksRef.current = [];
     try {
-      leaveRoom(meetingId, myId);
-      // Skip POST /leave when the host is ending the meeting — POST /end
-      // already terminates the session server-side. Calling /leave too would
-      // produce duplicate audit log entries and noisy server logs.
-      if (!isEndingRef.current) {
-        api.post(`/meetings/${meetingId}/leave`).catch(() => { });
+      const buf = await blob.arrayBuffer();
+      if (socketRef.current?.connected) {
+        socketRef.current.emit('audio-chunk', {
+          meetingId,
+          audioChunk: buf,
+          timestamp: Date.now(),
+          recordingStartTime: myRecordingStartTimeRef.current
+        });
+        await new Promise(r => setTimeout(r, 500));
       }
     } catch (_) { }
-  }, [meetingId, myId]);
+  }
+  if (myRecorderRef.current?.state !== 'inactive') myRecorderRef.current?.stop();
+  myRecorderRef.current = null; myRecordingStartTimeRef.current = null; initSegmentRef.current = null; setIsMyRecording(false);
+}, [meetingId]);
 
-  useEffect(() => {
-    let mounted = true;
-    const init = async () => {
+// ─────────────────────────────────────────────────────────────────────────
+// cleanup() — tears down media, peers, and socket room membership.
+//
+// FIX (Issue 3): hasCleanedUpRef.current guards against this running more
+// than once. The first caller sets the flag and proceeds; all subsequent
+// callers (useEffect return, meeting-ended handler, leaveMeeting) return
+// immediately. This eliminates the 3× simultaneous POST /leave requests.
+//
+// Note: stopMyRecording() is intentionally NOT called here. Every call path
+// that leads to cleanup() is responsible for awaiting stopMyRecording()
+// first, then emitting flush-my-chunks, then calling cleanup(). This keeps
+// the ordering correct and avoids a double-stop of the MediaRecorder.
+// ─────────────────────────────────────────────────────────────────────────
+const cleanup = useCallback(() => {
+  if (hasCleanedUpRef.current) return;
+  hasCleanedUpRef.current = true;
+
+  localStreamRef.current?.getTracks().forEach(t => t.stop());
+  localStreamRef.current = null;
+  Object.keys(peersRef.current).forEach(uid => {
+    try { peersRef.current[uid]?.destroy(); } catch (_) { }
+    delete peersRef.current[uid];
+  });
+  if (networkWarningTimerRef.current) clearTimeout(networkWarningTimerRef.current);
+
+  try {
+    leaveRoom(meetingId, myId);
+    // Skip POST /leave when the host is ending the meeting — POST /end
+    // already terminates the session server-side. Calling /leave too would
+    // produce duplicate audit log entries and noisy server logs.
+    if (!isEndingRef.current) {
+      api.post(`/meetings/${meetingId}/leave`).catch(() => { });
+    }
+  } catch (_) { }
+}, [meetingId, myId]);
+
+useEffect(() => {
+  let mounted = true;
+  const init = async () => {
+    try {
+      unlockAudioContext(); await fetchParticipantNames();
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720, facingMode: 'user' }, audio: true });
+      if (!mounted) { stream.getTracks().forEach(t => t.stop()); return; }
+      localStreamRef.current = stream;
+      if (localVideoRef.current) localVideoRef.current.srcObject = stream;
+      socketRef.current = getSocket();
       try {
-        unlockAudioContext(); await fetchParticipantNames();
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720, facingMode: 'user' }, audio: true });
-        if (!mounted) { stream.getTracks().forEach(t => t.stop()); return; }
-        localStreamRef.current = stream;
-        if (localVideoRef.current) localVideoRef.current.srcObject = stream;
-        socketRef.current = getSocket();
-        try {
-          const joinRes = await api.post(`/meetings/${meetingId}/join`);
-          const mtg = joinRes.data.meeting;
-          const hostId = (mtg?.host?._id || mtg?.host)?.toString();
-          if (mounted) setIsHost(hostId === myId);
-        } catch (e) { console.warn('Join API:', e.message); }
+        const joinRes = await api.post(`/meetings/${meetingId}/join`);
+        const mtg = joinRes.data.meeting;
+        const hostId = (mtg?.host?._id || mtg?.host)?.toString();
+        if (mounted) setIsHost(hostId === myId);
+      } catch (e) { console.warn('Join API:', e.message); }
 
-        broadcastMediaState(true, true);
+      broadcastMediaState(true, true);
 
-        socketRef.current.on('participant-names', nameMap => {
-          if (!mounted) return;
-          setParticipantNames(prev => { const merged = { ...prev }; Object.entries(nameMap).forEach(([uid, name]) => { merged[uid] = { ...merged[uid], fullName: name }; }); return merged; });
-        });
+      socketRef.current.on('participant-names', nameMap => {
+        if (!mounted) return;
+        setParticipantNames(prev => { const merged = { ...prev }; Object.entries(nameMap).forEach(([uid, name]) => { merged[uid] = { ...merged[uid], fullName: name }; }); return merged; });
+      });
 
-        socketRef.current.on('participant-joined', ({ userId, displayName }) => {
-          if (!mounted) return;
-          setParticipantNames(prev => ({ ...prev, [userId]: { ...prev[userId], fullName: displayName } }));
-          broadcastMediaState(isAudioEnabled, isVideoEnabled);
-        });
+      socketRef.current.on('participant-joined', ({ userId, displayName }) => {
+        if (!mounted) return;
+        setParticipantNames(prev => ({ ...prev, [userId]: { ...prev[userId], fullName: displayName } }));
+        broadcastMediaState(isAudioEnabled, isVideoEnabled);
+      });
 
-        socketRef.current.on('existing-users', users => {
-          if (!mounted) return;
-          users.forEach(({ userId }) => { if (!userId || userId?.toString() === myId) return; createPeer(userId, true, stream); });
-        });
+      socketRef.current.on('existing-users', users => {
+        if (!mounted) return;
+        users.forEach(({ userId }) => { if (!userId || userId?.toString() === myId) return; createPeer(userId, true, stream); });
+      });
 
-        socketRef.current.on('user-connected', userId => {
-          if (!mounted || !userId || userId?.toString() === myId) return;
-          toast.success(`${getParticipantName(userId)} joined`); fetchParticipantNames();
-          if (!peersRef.current[userId]) createPeer(userId, false, stream);
-          lastPeerActivityRef.current = Date.now();
-          setNetworkWarning(false);
-        });
+      socketRef.current.on('user-connected', userId => {
+        if (!mounted || !userId || userId?.toString() === myId) return;
+        toast.success(`${getParticipantName(userId)} joined`); fetchParticipantNames();
+        if (!peersRef.current[userId]) createPeer(userId, false, stream);
+        lastPeerActivityRef.current = Date.now();
+        setNetworkWarning(false);
+      });
 
-        socketRef.current.on('user-disconnected', userId => {
-          if (!mounted) return;
-          destroyPeer(userId); toast(`${getParticipantName(userId)} left`, { icon: '👋' });
-          setParticipantMediaState(prev => { const n = { ...prev }; delete n[userId?.toString()]; return n; });
-        });
+      socketRef.current.on('user-disconnected', userId => {
+        if (!mounted) return;
+        destroyPeer(userId); toast(`${getParticipantName(userId)} left`, { icon: '👋' });
+        setParticipantMediaState(prev => { const n = { ...prev }; delete n[userId?.toString()]; return n; });
+      });
 
-        socketRef.current.on('offer', ({ offer, userId }) => { if (!mounted) return; if (peersRef.current[userId]) peersRef.current[userId].signal(offer); else createPeer(userId, false, stream, offer); });
-        socketRef.current.on('answer', ({ answer, userId }) => { peersRef.current[userId]?.signal(answer); });
-        socketRef.current.on('ice-candidate', ({ candidate, userId }) => { peersRef.current[userId]?.signal(candidate); });
-        socketRef.current.on('peer-restart', ({ userId: uid }) => { if (!mounted) return; destroyPeer(uid); });
+      socketRef.current.on('offer', ({ offer, userId }) => { if (!mounted) return; if (peersRef.current[userId]) peersRef.current[userId].signal(offer); else createPeer(userId, false, stream, offer); });
+      socketRef.current.on('answer', ({ answer, userId }) => { peersRef.current[userId]?.signal(answer); });
+      socketRef.current.on('ice-candidate', ({ candidate, userId }) => { peersRef.current[userId]?.signal(candidate); });
+      socketRef.current.on('peer-restart', ({ userId: uid }) => { if (!mounted) return; destroyPeer(uid); });
 
-        socketRef.current.on('media-state-update', ({ userId, audio, video }) => {
-          if (!mounted || userId?.toString() === myId) return;
-          setParticipantMediaState(prev => ({ ...prev, [userId.toString()]: { audio, video } }));
-        });
+      socketRef.current.on('media-state-update', ({ userId, audio, video }) => {
+        if (!mounted || userId?.toString() === myId) return;
+        setParticipantMediaState(prev => ({ ...prev, [userId.toString()]: { audio, video } }));
+      });
 
-        socketRef.current.on('chat-message', ({ userId, message, timestamp, userName }) => {
-          if (!mounted || userId?.toString() === myId) return;
+      socketRef.current.on('chat-message', ({ userId, message, timestamp, userName }) => {
+        if (!mounted || userId?.toString() === myId) return;
 
-          if (message.startsWith('EMOJI_REACTION:')) {
-            const emoji = message.split(':')[1];
-            const reactionId = Date.now() + Math.random();
-            setReactions(prev => [...prev, { id: reactionId, emoji, left: Math.random() * 80 + 10 }]);
-            setTimeout(() => setReactions(prev => prev.filter(r => r.id !== reactionId)), 3000);
-            return;
-          }
+        if (message.startsWith('EMOJI_REACTION:')) {
+          const emoji = message.split(':')[1];
+          const reactionId = Date.now() + Math.random();
+          setReactions(prev => [...prev, { id: reactionId, emoji, left: Math.random() * 80 + 10 }]);
+          setTimeout(() => setReactions(prev => prev.filter(r => r.id !== reactionId)), 3000);
+          return;
+        }
 
-          const senderName = userName || getParticipantName(userId);
-          setMessages(prev => [...prev, { id: Date.now() + Math.random(), userId: userId?.toString(), userName: senderName, message, timestamp, isOwn: false }]);
-          setChatOpen(prev => { if (!prev) { setUnreadCount(c => c + 1); toast(`💬 ${senderName}: ${message.substring(0, 40)}`, { duration: 3000 }); } return prev; });
-        });
+        const senderName = userName || getParticipantName(userId);
+        setMessages(prev => [...prev, { id: Date.now() + Math.random(), userId: userId?.toString(), userName: senderName, message, timestamp, isOwn: false }]);
+        setChatOpen(prev => { if (!prev) { setUnreadCount(c => c + 1); toast(`💬 ${senderName}: ${message.substring(0, 40)}`, { duration: 3000 }); } return prev; });
+      });
 
-        socketRef.current.on('hand-raised', ({ userId }) => {
-          if (!mounted) return;
-          setRaisedHands(prev => new Set([...prev, userId?.toString()]));
-          if (userId?.toString() !== myId) {
-            toast(`✋ ${getParticipantName(userId)} raised their hand`, { duration: 5000 });
-          }
-        });
-        socketRef.current.on('hand-lowered', ({ userId }) => { if (!mounted) return; setRaisedHands(prev => { const n = new Set(prev); n.delete(userId?.toString()); return n; }); });
+      socketRef.current.on('hand-raised', ({ userId }) => {
+        if (!mounted) return;
+        setRaisedHands(prev => new Set([...prev, userId?.toString()]));
+        if (userId?.toString() !== myId) {
+          toast(`✋ ${getParticipantName(userId)} raised their hand`, { duration: 5000 });
+        }
+      });
+      socketRef.current.on('hand-lowered', ({ userId }) => { if (!mounted) return; setRaisedHands(prev => { const n = new Set(prev); n.delete(userId?.toString()); return n; }); });
 
-        socketRef.current.on('recording-started', () => {
-          setIsRecording(true); if (mounted && localStreamRef.current) startMyRecording(localStreamRef.current);
-        });
+      socketRef.current.on('recording-started', () => {
+        setIsRecording(true); if (mounted && localStreamRef.current) startMyRecording(localStreamRef.current);
+      });
 
-        socketRef.current.on('recording-status', (isCurrentlyRecording) => {
-          if (!mounted) return;
-          setIsRecording(isCurrentlyRecording);
-          if (isCurrentlyRecording && localStreamRef.current) {
-            startMyRecording(localStreamRef.current);
-          }
-        });
+      socketRef.current.on('recording-status', (isCurrentlyRecording) => {
+        if (!mounted) return;
+        setIsRecording(isCurrentlyRecording);
+        if (isCurrentlyRecording && localStreamRef.current) {
+          startMyRecording(localStreamRef.current);
+        }
+      });
 
-        socketRef.current.on('recording-stopped', () => { setIsRecording(false); stopMyRecording(); });
+      socketRef.current.on('recording-stopped', () => { setIsRecording(false); stopMyRecording(); });
 
-        // ── meeting-ended socket handler ────────────────────────────────
-        // Fired on ALL clients (including the host) when the host calls
-        // POST /end. The host skips this via isEndingRef — handleEndMeeting
-        // does its own ordered teardown. Non-host clients run the full path:
-        //   stopMyRecording → flush-my-chunks → wait → cleanup → navigate
-        socketRef.current.on('meeting-ended', async () => {
-          if (isEndingRef.current) return; // host is already handling this
-          // Show overlay immediately so user knows what's happening
-          setMeetingEndedOverlay(true);
-          toast.success('Meeting ended by host — saving your audio...');
-          await stopMyRecording();
-          if (socketRef.current?.connected) {
-            socketRef.current.emit('flush-my-chunks', { meetingId });
-            // Wait 3s so the server-side background VAD scoring and S3 write
-            // can complete before cleanup() closes the socket connection.
-            await new Promise(r => setTimeout(r, 3000));
-          }
+      // ── meeting-ended socket handler ────────────────────────────────
+      // Fired on ALL clients (including the host) when the host calls
+      // POST /end. The host skips this via isEndingRef — handleEndMeeting
+      // does its own ordered teardown. Non-host clients run the full path:
+      //   stopMyRecording → flush-my-chunks → wait → cleanup → navigate
+      socketRef.current.on('meeting-ended', async () => {
+        if (isEndingRef.current) return; // host is already handling this
+        // Show overlay immediately so user knows what's happening
+        setMeetingEndedOverlay(true);
+        toast.success('Meeting ended by host — saving your audio...');
+        await stopMyRecording();
+        if (socketRef.current?.connected) {
+          socketRef.current.emit('flush-my-chunks', { meetingId });
+          // Wait 3s so the server-side background VAD scoring and S3 write
+          // can complete before cleanup() closes the socket connection.
+          await new Promise(r => setTimeout(r, 3000));
+        }
+        cleanup();
+        // Hard redirect — ensures navigation even if Next.js router is slow
+        window.location.href = `/meetings/${meetingId}`;
+      });
+
+      socketRef.current.on('meeting-cancelled', ({ message }) => {
+        setMeetingCancelled(true);
+        toast.error(message || 'Meeting has been cancelled by the host');
+        // stopMyRecording first so the final chunk is emitted before cleanup
+        stopMyRecording().then(() => {
           cleanup();
-          // Hard redirect — ensures navigation even if Next.js router is slow
-          window.location.href = `/meetings/${meetingId}`;
+          setTimeout(() => router.push('/meetings/history'), 2000);
         });
+      });
 
-        socketRef.current.on('meeting-cancelled', ({ message }) => {
-          setMeetingCancelled(true);
-          toast.error(message || 'Meeting has been cancelled by the host');
-          // stopMyRecording first so the final chunk is emitted before cleanup
-          stopMyRecording().then(() => {
-            cleanup();
-            setTimeout(() => router.push('/meetings/history'), 2000);
-          });
-        });
+      joinRoom(meetingId, myId);
+      if (mounted) setIsConnecting(false);
+    } catch (error) {
+      console.error('Init error:', error);
+      if (mounted) { toast.error(error.name === 'NotAllowedError' ? 'Camera/microphone access denied.' : 'Failed to initialize meeting room.'); setIsConnecting(false); }
+    }
+  };
+  init();
 
-        joinRoom(meetingId, myId);
-        if (mounted) setIsConnecting(false);
-      } catch (error) {
-        console.error('Init error:', error);
-        if (mounted) { toast.error(error.name === 'NotAllowedError' ? 'Camera/microphone access denied.' : 'Failed to initialize meeting room.'); setIsConnecting(false); }
+  // ── useEffect teardown ──────────────────────────────────────────────
+  // FIX (Issue 3): Only call cleanup() if no explicit leave/end path has
+  // already done so. hasCleanedUpRef inside cleanup() guards the POST /leave
+  // call, but we also skip stopMyRecording() here because every explicit
+  // leave path already awaits it — calling it a second time would attempt to
+  // stop an already-stopped MediaRecorder and emit a duplicate audio-chunk.
+  return () => {
+    mounted = false;
+    // cleanup() is safe to call unconditionally — it guards itself with
+    // hasCleanedUpRef and is a no-op if already called. We do NOT call
+    // stopMyRecording() here because:
+    //   • leaveMeeting awaits it before calling cleanup()
+    //   • meeting-ended handler awaits it before calling cleanup()
+    //   • handleEndMeeting awaits it before calling cleanup()
+    // Calling it again here would double-stop the MediaRecorder.
+    cleanup();
+  };
+}, [meetingId, myId]);
+
+useEffect(() => { chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+useEffect(() => { if (chatOpen) setUnreadCount(0); }, [chatOpen]);
+
+const createPeer = (userId, initiator, stream, incomingOffer = null) => {
+  if (peersRef.current[userId]) { try { peersRef.current[userId].destroy(); } catch (_) { } delete peersRef.current[userId]; }
+  const peer = new SimplePeer({ initiator, trickle: true, stream, config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }, { urls: 'turn:mainline.proxy.rlwy.net:10424', username: 'catalyst', credential: 'catalyst123' }, { urls: 'turn:mainline.proxy.rlwy.net:10424?transport=tcp', username: 'catalyst', credential: 'catalyst123' }, { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }] } });
+  peer.on('signal', data => { if (!socketRef.current) return; if (data.type === 'offer') socketRef.current.emit('offer', { meetingId, offer: data, targetUserId: userId }); else if (data.type === 'answer') socketRef.current.emit('answer', { meetingId, answer: data, targetUserId: userId }); else if (data.candidate) socketRef.current.emit('ice-candidate', { meetingId, candidate: data, targetUserId: userId }); });
+  peer.on('stream', remoteStream => {
+    setRemoteStreams(prev => ({ ...prev, [userId]: remoteStream }));
+    lastPeerActivityRef.current = Date.now();
+    setNetworkWarning(false);
+  });
+  peer.on('close', () => destroyPeer(userId));
+  peer.on('error', err => { console.warn(`Peer error ${userId}:`, err.message); if (err.message.includes('Connection failed') && localStreamRef.current) { setTimeout(() => { socketRef.current?.emit('peer-restart', { meetingId, targetUserId: userId }); destroyPeer(userId); createPeer(userId, true, localStreamRef.current); }, 3000); } setRemoteStreams(prev => { const n = { ...prev }; delete n[userId]; return n; }); });
+
+  if (peer._pc) {
+    const updateNetworkStatus = () => {
+      const state = peer._pc?.connectionState;
+      const iceState = peer._pc?.iceConnectionState;
+      const isUnstable = state === 'disconnected' || state === 'failed' || iceState === 'disconnected';
+      setParticipantNetworkStatus(prev => prev[userId] === isUnstable ? prev : { ...prev, [userId]: isUnstable });
+      if (isUnstable) {
+        setNetworkWarning(true);
+      } else if (state === 'connected') {
+        lastPeerActivityRef.current = Date.now();
+        setNetworkWarning(false);
       }
     };
-    init();
+    peer._pc.onconnectionstatechange = updateNetworkStatus;
+    peer._pc.oniceconnectionstatechange = updateNetworkStatus;
+  }
 
-    // ── useEffect teardown ──────────────────────────────────────────────
-    // FIX (Issue 3): Only call cleanup() if no explicit leave/end path has
-    // already done so. hasCleanedUpRef inside cleanup() guards the POST /leave
-    // call, but we also skip stopMyRecording() here because every explicit
-    // leave path already awaits it — calling it a second time would attempt to
-    // stop an already-stopped MediaRecorder and emit a duplicate audio-chunk.
-    return () => {
-      mounted = false;
-      // cleanup() is safe to call unconditionally — it guards itself with
-      // hasCleanedUpRef and is a no-op if already called. We do NOT call
-      // stopMyRecording() here because:
-      //   • leaveMeeting awaits it before calling cleanup()
-      //   • meeting-ended handler awaits it before calling cleanup()
-      //   • handleEndMeeting awaits it before calling cleanup()
-      // Calling it again here would double-stop the MediaRecorder.
-      cleanup();
+  if (incomingOffer) peer.signal(incomingOffer);
+  peersRef.current[userId] = peer;
+};
+
+const destroyPeer = (userId) => {
+  try { peersRef.current[userId]?.destroy(); } catch (_) { }
+  delete peersRef.current[userId];
+  setRemoteStreams(prev => { const n = { ...prev }; delete n[userId]; return n; });
+  setPinnedUserId(prev => prev === userId ? null : prev);
+  delete audioLevelsRef.current[userId];
+  setRingLevels(prev => { const n = { ...prev }; delete n[userId]; return n; });
+  setParticipantNetworkStatus(prev => { const n = { ...prev }; delete n[userId]; return n; });
+};
+
+const toggleAudio = useCallback(() => {
+  const newEnabled = !isAudioEnabled;
+  localStreamRef.current?.getAudioTracks().forEach(t => { t.enabled = newEnabled; });
+  setIsAudioEnabled(newEnabled);
+  broadcastMediaState(newEnabled, isVideoEnabled);
+}, [isAudioEnabled, isVideoEnabled, broadcastMediaState]);
+
+const toggleVideo = useCallback(() => {
+  const newEnabled = !isVideoEnabled;
+  localStreamRef.current?.getVideoTracks().forEach(t => { t.enabled = newEnabled; });
+  setIsVideoEnabled(newEnabled);
+  broadcastMediaState(isAudioEnabled, newEnabled);
+}, [isAudioEnabled, isVideoEnabled, broadcastMediaState]);
+
+const stopScreenShare = useCallback(() => {
+  const cameraTrack = localStreamRef.current?.getVideoTracks()[0];
+  if (cameraTrack) { Object.values(peersRef.current).forEach(peer => { try { const sender = peer._pc?.getSenders().find(s => s.track?.kind === 'video'); sender?.replaceTrack(cameraTrack); } catch (_) { } }); }
+  if (localVideoRef.current && localStreamRef.current) localVideoRef.current.srcObject = localStreamRef.current;
+  setIsScreenSharing(false);
+}, []);
+
+const toggleScreenShare = useCallback(async () => {
+  try {
+    if (!isScreenSharing) {
+      const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: { cursor: 'always' }, audio: false });
+      const screenTrack = screenStream.getVideoTracks()[0];
+      Object.values(peersRef.current).forEach(peer => { try { const sender = peer._pc?.getSenders().find(s => s.track?.kind === 'video'); sender?.replaceTrack(screenTrack); } catch (_) { } });
+      if (localVideoRef.current) localVideoRef.current.srcObject = screenStream;
+      screenTrack.onended = stopScreenShare; setIsScreenSharing(true);
+    } else { stopScreenShare(); }
+  } catch (e) { if (e.name !== 'NotAllowedError') toast.error('Screen sharing failed'); setIsScreenSharing(false); }
+}, [isScreenSharing, stopScreenShare]);
+
+const toggleHand = useCallback(() => {
+  if (!socketRef.current) return;
+  if (isHandRaised) { socketRef.current.emit('lower-hand', { meetingId }); setRaisedHands(prev => { const n = new Set(prev); n.delete(myId); return n; }); }
+  else { socketRef.current.emit('raise-hand', { meetingId }); setRaisedHands(prev => new Set([...prev, myId])); }
+  setIsHandRaised(p => !p);
+}, [isHandRaised, meetingId, myId]);
+
+const startRecording = useCallback(() => {
+  if (!localStreamRef.current) return;
+  try {
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)(), destination = audioContext.createMediaStreamDestination();
+    audioContext.createMediaStreamSource(localStreamRef.current).connect(destination);
+    Object.entries(remoteStreams).forEach(([uid, rs]) => { if (rs?.getAudioTracks().length) { try { audioContext.createMediaStreamSource(rs).connect(destination); } catch (e) { console.warn('Remote audio mix failed for', uid, e.message); } } });
+    const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm';
+    const recorder = new MediaRecorder(destination.stream, { mimeType });
+    recordingChunksRef.current = [];
+    recorder.ondataavailable = e => { if (e.data.size > 0) recordingChunksRef.current.push(e.data); };
+    recorder.onstop = async () => {
+      isUploadingRef.current = true;
+      const chunks = [...recordingChunksRef.current];
+      recordingChunksRef.current = [];
+      const blob = new Blob(chunks, { type: 'audio/webm' });
+
+      try {
+        await stopMyRecording();
+        await new Promise(r => setTimeout(r, 2500));
+
+        const fd = new FormData();
+        fd.append('recording', blob, 'meeting-recording.webm');
+
+        toast.loading('Uploading recording...', { id: 'upload' });
+        await api.post(`/meetings/${meetingId}/upload-recording`, fd, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+
+        toast.success(
+          'Recording saved! Go to the meeting page and click "Analyze Meeting" when ready.',
+          { id: 'upload', duration: 6000 }
+        );
+      } catch (e) {
+        console.error('Upload failed:', e);
+        toast.error('Failed to upload recording. Please try manual upload in history.', { id: 'upload' });
+      } finally {
+        isUploadingRef.current = false;
+      }
     };
-  }, [meetingId, myId]);
+    recorder.start(1000); mediaRecorderRef.current = recorder;
+    socketRef.current?.emit('start-recording', { meetingId }); setIsRecording(true); toast.success('Recording started');
+  } catch (e) { toast.error('Could not start recording: ' + e.message); }
+}, [meetingId, remoteStreams, stopMyRecording]);
 
-  useEffect(() => { chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
-  useEffect(() => { if (chatOpen) setUnreadCount(0); }, [chatOpen]);
+const stopRecording = useCallback(() => {
+  if (mediaRecorderRef.current?.state !== 'inactive') mediaRecorderRef.current?.stop();
+  socketRef.current?.emit('stop-recording', { meetingId });
+  setIsRecording(false);
+  isUploadingRef.current = true;
+  toast.success('Recording stopped — uploading...');
+}, [meetingId]);
 
-  const createPeer = (userId, initiator, stream, incomingOffer = null) => {
-    if (peersRef.current[userId]) { try { peersRef.current[userId].destroy(); } catch (_) { } delete peersRef.current[userId]; }
-    const peer = new SimplePeer({ initiator, trickle: true, stream, config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }, { urls: 'turn:mainline.proxy.rlwy.net:10424', username: 'catalyst', credential: 'catalyst123' }, { urls: 'turn:mainline.proxy.rlwy.net:10424?transport=tcp', username: 'catalyst', credential: 'catalyst123' }, { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }] } });
-    peer.on('signal', data => { if (!socketRef.current) return; if (data.type === 'offer') socketRef.current.emit('offer', { meetingId, offer: data, targetUserId: userId }); else if (data.type === 'answer') socketRef.current.emit('answer', { meetingId, answer: data, targetUserId: userId }); else if (data.candidate) socketRef.current.emit('ice-candidate', { meetingId, candidate: data, targetUserId: userId }); });
-    peer.on('stream', remoteStream => {
-      setRemoteStreams(prev => ({ ...prev, [userId]: remoteStream }));
-      lastPeerActivityRef.current = Date.now();
-      setNetworkWarning(false);
-    });
-    peer.on('close', () => destroyPeer(userId));
-    peer.on('error', err => { console.warn(`Peer error ${userId}:`, err.message); if (err.message.includes('Connection failed') && localStreamRef.current) { setTimeout(() => { socketRef.current?.emit('peer-restart', { meetingId, targetUserId: userId }); destroyPeer(userId); createPeer(userId, true, localStreamRef.current); }, 3000); } setRemoteStreams(prev => { const n = { ...prev }; delete n[userId]; return n; }); });
+// ── leaveMeeting ──────────────────────────────────────────────────────────
+// FIX (Issue 3): Non-host participant leaving.
+//
+// Correct ordering:
+//   1. stopMyRecording() — flush final buffered chunk to socket (awaited)
+//   2. flush-my-chunks  — server uploads chunks + VAD scores to S3
+//   3. wait 2s          — give server time to finish background VAD + S3 write
+//   4. cleanup()        — stops tracks, destroys peers, POST /leave
+//   5. navigate         — safe to navigate now that socket is done
+//
+// Previously this was not async so stopMyRecording was fire-and-forget,
+// meaning the final chunk was frequently dropped on fast navigations.
+// flush-my-chunks was also missing entirely for non-host participants.
+const leaveMeeting = useCallback(async () => {
+  await stopMyRecording();
+  if (socketRef.current?.connected) {
+    socketRef.current.emit('flush-my-chunks', { meetingId });
+    await new Promise(r => setTimeout(r, 2000));
+  }
+  cleanup();
+  router.push('/meetings/history');
+}, [meetingId, stopMyRecording, cleanup]);
 
-    if (peer._pc) {
-      peer._pc.onconnectionstatechange = () => {
-        const state = peer._pc?.connectionState;
-        if (state === 'disconnected' || state === 'failed') {
-          setNetworkWarning(true);
-        } else if (state === 'connected') {
-          lastPeerActivityRef.current = Date.now();
-          setNetworkWarning(false);
-        }
-      };
+// ── handleEndMeeting ──────────────────────────────────────────────────────
+// Host ends the meeting for everyone.
+//
+// isEndingRef blocks the 'meeting-ended' socket handler from racing with
+// this function — the host receives its own broadcast too.
+const handleEndMeeting = async () => {
+  if (!isHost || isEndingRef.current) return;
+  isEndingRef.current = true;
+  setIsEndingMeeting(true);
+  setMeetingEndedOverlay(true);
+  try {
+    // POST /end first — this fires the 'meeting-ended' socket event to all
+    // non-host participants so they start their own teardown immediately.
+    await api.post(`/meetings/${meetingId}/end`);
+
+    if (isRecording && mediaRecorderRef.current?.state !== 'inactive') {
+      toast.loading('Saving recording...', { id: 'end-meeting' });
+      await new Promise((resolve) => {
+        const originalOnStop = mediaRecorderRef.current.onstop;
+        mediaRecorderRef.current.onstop = async (e) => {
+          try { if (originalOnStop) await originalOnStop.call(mediaRecorderRef.current, e); } catch (_) { }
+          finally { resolve(); }
+        };
+        mediaRecorderRef.current.stop();
+        socketRef.current?.emit('stop-recording', { meetingId });
+        setIsRecording(false);
+      });
+      toast.dismiss('end-meeting');
+    } else {
+      await stopMyRecording();
     }
 
-    if (incomingOffer) peer.signal(incomingOffer);
-    peersRef.current[userId] = peer;
-  };
+    // If recording upload is still in-flight (host stopped recording just before
+    // ending), wait for it so the recording file lands in S3 before we navigate.
+    if (isUploadingRef.current) {
+      toast.loading('Uploading recording — please wait...', { id: 'wait-upload' });
+      while (isUploadingRef.current) {
+        await new Promise(r => setTimeout(r, 500));
+      }
+      toast.dismiss('wait-upload');
+    }
 
-  const destroyPeer = (userId) => {
-    try { peersRef.current[userId]?.destroy(); } catch (_) { }
-    delete peersRef.current[userId];
-    setRemoteStreams(prev => { const n = { ...prev }; delete n[userId]; return n; });
-    setPinnedUserId(prev => prev === userId ? null : prev);
-    delete audioLevelsRef.current[userId];
-    setRingLevels(prev => { const n = { ...prev }; delete n[userId]; return n; });
-  };
-
-  const toggleAudio = useCallback(() => {
-    const newEnabled = !isAudioEnabled;
-    localStreamRef.current?.getAudioTracks().forEach(t => { t.enabled = newEnabled; });
-    setIsAudioEnabled(newEnabled);
-    broadcastMediaState(newEnabled, isVideoEnabled);
-  }, [isAudioEnabled, isVideoEnabled, broadcastMediaState]);
-
-  const toggleVideo = useCallback(() => {
-    const newEnabled = !isVideoEnabled;
-    localStreamRef.current?.getVideoTracks().forEach(t => { t.enabled = newEnabled; });
-    setIsVideoEnabled(newEnabled);
-    broadcastMediaState(isAudioEnabled, newEnabled);
-  }, [isAudioEnabled, isVideoEnabled, broadcastMediaState]);
-
-  const stopScreenShare = useCallback(() => {
-    const cameraTrack = localStreamRef.current?.getVideoTracks()[0];
-    if (cameraTrack) { Object.values(peersRef.current).forEach(peer => { try { const sender = peer._pc?.getSenders().find(s => s.track?.kind === 'video'); sender?.replaceTrack(cameraTrack); } catch (_) { } }); }
-    if (localVideoRef.current && localStreamRef.current) localVideoRef.current.srcObject = localStreamRef.current;
-    setIsScreenSharing(false);
-  }, []);
-
-  const toggleScreenShare = useCallback(async () => {
-    try {
-      if (!isScreenSharing) {
-        const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: { cursor: 'always' }, audio: false });
-        const screenTrack = screenStream.getVideoTracks()[0];
-        Object.values(peersRef.current).forEach(peer => { try { const sender = peer._pc?.getSenders().find(s => s.track?.kind === 'video'); sender?.replaceTrack(screenTrack); } catch (_) { } });
-        if (localVideoRef.current) localVideoRef.current.srcObject = screenStream;
-        screenTrack.onended = stopScreenShare; setIsScreenSharing(true);
-      } else { stopScreenShare(); }
-    } catch (e) { if (e.name !== 'NotAllowedError') toast.error('Screen sharing failed'); setIsScreenSharing(false); }
-  }, [isScreenSharing, stopScreenShare]);
-
-  const toggleHand = useCallback(() => {
-    if (!socketRef.current) return;
-    if (isHandRaised) { socketRef.current.emit('lower-hand', { meetingId }); setRaisedHands(prev => { const n = new Set(prev); n.delete(myId); return n; }); }
-    else { socketRef.current.emit('raise-hand', { meetingId }); setRaisedHands(prev => new Set([...prev, myId])); }
-    setIsHandRaised(p => !p);
-  }, [isHandRaised, meetingId, myId]);
-
-  const startRecording = useCallback(() => {
-    if (!localStreamRef.current) return;
-    try {
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)(), destination = audioContext.createMediaStreamDestination();
-      audioContext.createMediaStreamSource(localStreamRef.current).connect(destination);
-      Object.entries(remoteStreams).forEach(([uid, rs]) => { if (rs?.getAudioTracks().length) { try { audioContext.createMediaStreamSource(rs).connect(destination); } catch (e) { console.warn('Remote audio mix failed for', uid, e.message); } } });
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm';
-      const recorder = new MediaRecorder(destination.stream, { mimeType });
-      recordingChunksRef.current = [];
-      recorder.ondataavailable = e => { if (e.data.size > 0) recordingChunksRef.current.push(e.data); };
-      recorder.onstop = async () => {
-        isUploadingRef.current = true;
-        const chunks = [...recordingChunksRef.current];
-        recordingChunksRef.current = [];
-        const blob = new Blob(chunks, { type: 'audio/webm' });
-
-        try {
-          await stopMyRecording();
-          await new Promise(r => setTimeout(r, 2500));
-
-          const fd = new FormData();
-          fd.append('recording', blob, 'meeting-recording.webm');
-
-          toast.loading('Uploading recording...', { id: 'upload' });
-          await api.post(`/meetings/${meetingId}/upload-recording`, fd, {
-            headers: { 'Content-Type': 'multipart/form-data' }
-          });
-
-          toast.success(
-            'Recording saved! Go to the meeting page and click "Analyze Meeting" when ready.',
-            { id: 'upload', duration: 6000 }
-          );
-        } catch (e) {
-          console.error('Upload failed:', e);
-          toast.error('Failed to upload recording. Please try manual upload in history.', { id: 'upload' });
-        } finally {
-          isUploadingRef.current = false;
-        }
-      };
-      recorder.start(1000); mediaRecorderRef.current = recorder;
-      socketRef.current?.emit('start-recording', { meetingId }); setIsRecording(true); toast.success('Recording started');
-    } catch (e) { toast.error('Could not start recording: ' + e.message); }
-  }, [meetingId, remoteStreams, stopMyRecording]);
-
-  const stopRecording = useCallback(() => {
-    if (mediaRecorderRef.current?.state !== 'inactive') mediaRecorderRef.current?.stop();
-    socketRef.current?.emit('stop-recording', { meetingId });
-    setIsRecording(false);
-    isUploadingRef.current = true;
-    toast.success('Recording stopped — uploading...');
-  }, [meetingId]);
-
-  // ── leaveMeeting ──────────────────────────────────────────────────────────
-  // FIX (Issue 3): Non-host participant leaving.
-  //
-  // Correct ordering:
-  //   1. stopMyRecording() — flush final buffered chunk to socket (awaited)
-  //   2. flush-my-chunks  — server uploads chunks + VAD scores to S3
-  //   3. wait 2s          — give server time to finish background VAD + S3 write
-  //   4. cleanup()        — stops tracks, destroys peers, POST /leave
-  //   5. navigate         — safe to navigate now that socket is done
-  //
-  // Previously this was not async so stopMyRecording was fire-and-forget,
-  // meaning the final chunk was frequently dropped on fast navigations.
-  // flush-my-chunks was also missing entirely for non-host participants.
-  const leaveMeeting = useCallback(async () => {
-    await stopMyRecording();
+    // Flush host's own per-device audio chunks to S3.
+    // Keep the socket alive long enough for this to complete before cleanup()
+    // closes the connection — non-host clients already have a 3s window too.
     if (socketRef.current?.connected) {
       socketRef.current.emit('flush-my-chunks', { meetingId });
       await new Promise(r => setTimeout(r, 2000));
     }
+
     cleanup();
-    router.push('/meetings/history');
-  }, [meetingId, stopMyRecording, cleanup]);
+    // Hard redirect — more reliable than router.push after socket teardown
+    window.location.href = `/meetings/${meetingId}`;
+  } catch (e) {
+    isEndingRef.current = false;
+    setMeetingEndedOverlay(false);
+    toast.error(e?.response?.data?.message || 'Failed to end meeting');
+    setIsEndingMeeting(false);
+  }
+};
 
-  // ── handleEndMeeting ──────────────────────────────────────────────────────
-  // Host ends the meeting for everyone.
-  //
-  // isEndingRef blocks the 'meeting-ended' socket handler from racing with
-  // this function — the host receives its own broadcast too.
-  const handleEndMeeting = async () => {
-    if (!isHost || isEndingRef.current) return;
-    isEndingRef.current = true;
-    setIsEndingMeeting(true);
-    setMeetingEndedOverlay(true);
-    try {
-      // POST /end first — this fires the 'meeting-ended' socket event to all
-      // non-host participants so they start their own teardown immediately.
-      await api.post(`/meetings/${meetingId}/end`);
+const remoteEntries = Object.entries(remoteStreams);
+const totalParticipants = remoteEntries.length + 1;
 
-      if (isRecording && mediaRecorderRef.current?.state !== 'inactive') {
-        toast.loading('Saving recording...', { id: 'end-meeting' });
-        await new Promise((resolve) => {
-          const originalOnStop = mediaRecorderRef.current.onstop;
-          mediaRecorderRef.current.onstop = async (e) => {
-            try { if (originalOnStop) await originalOnStop.call(mediaRecorderRef.current, e); } catch (_) { }
-            finally { resolve(); }
-          };
-          mediaRecorderRef.current.stop();
-          socketRef.current?.emit('stop-recording', { meetingId });
-          setIsRecording(false);
-        });
-        toast.dismiss('end-meeting');
-      } else {
-        await stopMyRecording();
-      }
+useEffect(() => {
+  if (!pinnedUserId && totalParticipants <= 4) {
+    setLayoutMode('tile');
+  } else if (pinnedUserId || totalParticipants > 4) {
+    setLayoutMode('stage');
+  }
+}, [totalParticipants, pinnedUserId]);
 
-      // If recording upload is still in-flight (host stopped recording just before
-      // ending), wait for it so the recording file lands in S3 before we navigate.
-      if (isUploadingRef.current) {
-        toast.loading('Uploading recording — please wait...', { id: 'wait-upload' });
-        while (isUploadingRef.current) {
-          await new Promise(r => setTimeout(r, 500));
-        }
-        toast.dismiss('wait-upload');
-      }
-
-      // Flush host's own per-device audio chunks to S3.
-      // Keep the socket alive long enough for this to complete before cleanup()
-      // closes the connection — non-host clients already have a 3s window too.
-      if (socketRef.current?.connected) {
-        socketRef.current.emit('flush-my-chunks', { meetingId });
-        await new Promise(r => setTimeout(r, 2000));
-      }
-
-      cleanup();
-      // Hard redirect — more reliable than router.push after socket teardown
-      window.location.href = `/meetings/${meetingId}`;
-    } catch (e) {
-      isEndingRef.current = false;
-      setMeetingEndedOverlay(false);
-      toast.error(e?.response?.data?.message || 'Failed to end meeting');
-      setIsEndingMeeting(false);
-    }
-  };
-
-  const remoteEntries = Object.entries(remoteStreams);
-  const totalParticipants = remoteEntries.length + 1;
-
-  useEffect(() => {
-    if (!pinnedUserId && totalParticipants <= 4) {
-      setLayoutMode('tile');
-    } else if (pinnedUserId || totalParticipants > 4) {
-      setLayoutMode('stage');
-    }
-  }, [totalParticipants, pinnedUserId]);
-
-  if (meetingEndedOverlay) return (
-    <div className="h-screen flex items-center justify-center bg-[var(--jitsi-bg)] text-white">
-      <div className="text-center space-y-5">
-        <div className="animate-spin h-14 w-14 border-2 border-green-400 border-t-transparent rounded-full mx-auto" />
-        <h2 className="text-xl font-semibold text-green-400">Meeting Ended</h2>
-        <p className="text-white/70">Saving your audio and redirecting...</p>
-        <p className="text-white/40 text-sm">Please wait — do not close this tab.</p>
-      </div>
+if (meetingEndedOverlay) return (
+  <div className="h-screen flex items-center justify-center bg-[var(--jitsi-bg)] text-white">
+    <div className="text-center space-y-5">
+      <div className="animate-spin h-14 w-14 border-2 border-green-400 border-t-transparent rounded-full mx-auto" />
+      <h2 className="text-xl font-semibold text-green-400">Meeting Ended</h2>
+      <p className="text-white/70">Saving your audio and redirecting...</p>
+      <p className="text-white/40 text-sm">Please wait — do not close this tab.</p>
     </div>
-  );
+  </div>
+);
 
-  if (meetingCancelled) return (
-    <div className="h-screen flex items-center justify-center bg-background text-foreground">
-      <div className="text-center space-y-4">
-        <div className="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center mx-auto"><X className="h-8 w-8 text-red-500" /></div>
-        <h2 className="text-xl font-semibold">Meeting Cancelled</h2>
-        <p className="text-muted-foreground">This meeting has been cancelled by the host.</p>
-        <p className="text-muted-foreground text-sm">Redirecting to meetings...</p>
-      </div>
+if (meetingCancelled) return (
+  <div className="h-screen flex items-center justify-center bg-background text-foreground">
+    <div className="text-center space-y-4">
+      <div className="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center mx-auto"><X className="h-8 w-8 text-red-500" /></div>
+      <h2 className="text-xl font-semibold">Meeting Cancelled</h2>
+      <p className="text-muted-foreground">This meeting has been cancelled by the host.</p>
+      <p className="text-muted-foreground text-sm">Redirecting to meetings...</p>
     </div>
-  );
+  </div>
+);
 
-  if (isConnecting) return (
-    <div className="h-screen flex items-center justify-center bg-background text-foreground">
-      <div className="text-center space-y-4">
-        <div className="animate-spin h-14 w-14 border-2 border-primary border-t-transparent rounded-full mx-auto" />
-        <p className="font-medium">Setting up your camera and microphone...</p>
-        <p className="text-muted-foreground text-sm">Please allow camera and microphone access when prompted</p>
-      </div>
+if (isConnecting) return (
+  <div className="h-screen flex items-center justify-center bg-background text-foreground">
+    <div className="text-center space-y-4">
+      <div className="animate-spin h-14 w-14 border-2 border-primary border-t-transparent rounded-full mx-auto" />
+      <p className="font-medium">Setting up your camera and microphone...</p>
+      <p className="text-muted-foreground text-sm">Please allow camera and microphone access when prompted</p>
     </div>
-  );
+  </div>
+);
 
-  const shouldZoom = !pinnedUserId && totalParticipants > 1 && activeSpeakerId !== null;
-  const zoomedId = shouldZoom ? activeSpeakerId : null;
-  const spotlightId = pinnedUserId || zoomedId || 'local';
+const shouldZoom = !pinnedUserId && totalParticipants > 1 && activeSpeakerId !== null;
+const zoomedId = shouldZoom ? activeSpeakerId : null;
+const spotlightId = pinnedUserId || zoomedId || 'local';
 
-  const controlsProps = { isAudioEnabled, isVideoEnabled, isScreenSharing, isMobile, isHandRaised, isRecording, isHost, isEndingMeeting, toggleAudio, toggleVideo, toggleScreenShare, toggleHand, startRecording, stopRecording, handleEndMeeting, leaveMeeting, triggerReaction: triggerReactionEvent, layoutMode, toggleLayout: () => setLayoutMode(p => p === 'stage' ? 'tile' : 'stage') };
-  const remoteProps = (uid) => ({ isMuted: participantMediaState[uid]?.audio === false, isCameraOff: participantMediaState[uid]?.video === false });
+const controlsProps = { isAudioEnabled, isVideoEnabled, isScreenSharing, isMobile, isHandRaised, isRecording, isHost, isEndingMeeting, toggleAudio, toggleVideo, toggleScreenShare, toggleHand, startRecording, stopRecording, handleEndMeeting, leaveMeeting, triggerReaction: triggerReactionEvent, layoutMode, toggleLayout: () => setLayoutMode(p => p === 'stage' ? 'tile' : 'stage') };
+const remoteProps = (uid) => ({ isMuted: participantMediaState[uid]?.audio === false, isCameraOff: participantMediaState[uid]?.video === false, isUnstable: participantNetworkStatus[uid] === true });
 
   return (
     <div className="h-screen bg-[var(--jitsi-bg)] text-white flex flex-col overflow-hidden relative font-sans">
+      <style>{`
+        @keyframes floatUpAndFade {
+          0% { transform: translateY(0) scale(0.5); opacity: 0; }
+          15% { transform: translateY(-30px) scale(1.5); opacity: 1; }
+          100% { transform: translateY(-250px) scale(1); opacity: 0; }
+        }
+        .emoji-float {
+          animation: floatUpAndFade 2.5s ease-out forwards;
+        }
+      `}</style>
+
       {reactions.map(r => (
-        <div key={r.id} className="fixed bottom-24 right-6 text-3xl animate-bounce pointer-events-none z-50">
+        <div key={r.id} className="fixed bottom-20 text-4xl pointer-events-none z-50 emoji-float" style={{ left: `${r.left}%` }}>
           {r.emoji}
         </div>
       ))}
@@ -947,10 +966,10 @@ export default function MeetingRoom({ meetingId, user, meetingName }) {
             </div>
           )}
           {networkWarning && (<div className="flex items-center gap-1 text-amber-500 text-xs bg-black/40 px-2 py-1 rounded"><WifiOff className="h-3 w-3" /> Unstable</div>)}
-          <div className="flex items-center gap-1.5 text-white/80 text-xs font-medium bg-black/40 px-2 py-1 rounded">
+          <button onClick={() => { setAttendeesOpen(p => !p); setChatOpen(false); }} className={cn('flex items-center gap-1.5 text-xs font-medium px-2 py-1.5 rounded transition-colors', attendeesOpen ? 'bg-white/20 text-white' : 'bg-black/40 text-white/80 hover:bg-black/60')}>
             <Users className="h-3 w-3" /> {totalParticipants}
-          </div>
-          <button onClick={() => setChatOpen(p => !p)} className={cn('relative p-1.5 rounded transition-colors', chatOpen ? 'bg-white/20 text-white' : 'bg-black/40 text-white/80 hover:bg-black/60')}>
+          </button>
+          <button onClick={() => { setChatOpen(p => !p); setAttendeesOpen(false); }} className={cn('relative p-1.5 rounded transition-colors', chatOpen ? 'bg-white/20 text-white' : 'bg-black/40 text-white/80 hover:bg-black/60')}>
             <MessageSquare className="h-4 w-4" />
             {unreadCount > 0 && (<span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] w-3.5 h-3.5 rounded-full flex items-center justify-center font-bold shadow-sm">{unreadCount > 9 ? '9+' : unreadCount}</span>)}
           </button>
@@ -1011,6 +1030,74 @@ export default function MeetingRoom({ meetingId, user, meetingName }) {
             </div>
           )}
         </div>
+
+        {/* Attendees Panel */}
+        {attendeesOpen && (
+          <div className={cn(
+            "bg-white flex flex-col z-50 transition-all duration-300 rounded-xl overflow-hidden shadow-xl border border-black/10 text-black mx-4 my-2",
+            isMobile ? "fixed inset-x-0 bottom-[100px] h-[60vh]" : "w-[360px] relative shrink-0"
+          )}>
+            <div className="px-5 py-4 flex items-center justify-between shrink-0 bg-white">
+              <span className="font-semibold text-gray-500 text-xs tracking-wider uppercase">In Call</span>
+              <button onClick={() => setAttendeesOpen(false)} className="text-gray-500 hover:text-black transition-all p-1.5 rounded hover:bg-black/5">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="flex-1 min-h-0 overflow-y-auto p-2 custom-scrollbar bg-white space-y-1">
+              {/* Local User */}
+              <div className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg transition-colors group">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-teal-600 flex items-center justify-center text-white font-medium shadow-sm shrink-0">
+                    {myName.charAt(0).toUpperCase()}
+                  </div>
+                  <span className="text-sm font-medium text-gray-700">{myName} (You)</span>
+                </div>
+                <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                  {ringLevels[myId] > 0.05 && (
+                    <div className="flex gap-0.5 items-center h-4">
+                      <div className="w-1 bg-teal-500 rounded-full animate-bounce" style={{ height: '60%', animationDelay: '0ms' }} />
+                      <div className="w-1 bg-teal-500 rounded-full animate-bounce" style={{ height: '100%', animationDelay: '150ms' }} />
+                      <div className="w-1 bg-teal-500 rounded-full animate-bounce" style={{ height: '60%', animationDelay: '300ms' }} />
+                    </div>
+                  )}
+                  <button className="text-gray-400 hover:text-gray-700"><Pin className="h-4 w-4" /></button>
+                </div>
+              </div>
+
+              {/* Remote Users */}
+              {remoteEntries.map(([uid]) => {
+                const name = getParticipantName(uid);
+                const isSpeaking = ringLevels[uid] > 0.05;
+                const colors = ['bg-indigo-600', 'bg-blue-600', 'bg-pink-600', 'bg-purple-600', 'bg-orange-600'];
+                let hash = 0; for (let i = 0; i < name.length; i++) { hash = name.charCodeAt(i) + ((hash << 5) - hash); }
+                const colorClass = colors[Math.abs(hash) % colors.length];
+
+                return (
+                  <div key={uid} className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg transition-colors group">
+                    <div className="flex items-center gap-3">
+                      <div className={cn("w-10 h-10 rounded-full flex items-center justify-center text-white font-medium shadow-sm shrink-0", colorClass)}>
+                        {name.charAt(0).toUpperCase()}
+                      </div>
+                      <span className="text-sm font-medium text-gray-700">{name}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {isSpeaking && (
+                        <div className="flex gap-0.5 items-center h-4">
+                          <div className="w-1 bg-teal-500 rounded-full animate-bounce" style={{ height: '60%', animationDelay: '0ms' }} />
+                          <div className="w-1 bg-teal-500 rounded-full animate-bounce" style={{ height: '100%', animationDelay: '150ms' }} />
+                          <div className="w-1 bg-teal-500 rounded-full animate-bounce" style={{ height: '60%', animationDelay: '300ms' }} />
+                        </div>
+                      )}
+                      <button className="text-gray-400 hover:text-gray-700 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Chat Panel */}
         {chatOpen && (
@@ -1101,7 +1188,7 @@ function LocalTile({ videoRef, name, role, isHost, isAudioEnabled, isVideoEnable
   );
 }
 
-function RemoteTile({ userId, stream, name, role, isMuted, isCameraOff, isHandRaised, isPinned, onPin, onFullscreen, large, thumbnail, isFullscreen, gallery, isActiveSpeaker, onAudioLevel, audioLevel }) {
+function RemoteTile({ userId, stream, name, role, isMuted, isCameraOff, isHandRaised, isPinned, onPin, onFullscreen, large, thumbnail, isFullscreen, gallery, isActiveSpeaker, onAudioLevel, audioLevel, isUnstable }) {
   const videoRef = useRef(null);
   const [hasVideo, setHasVideo] = useState(true);
 
@@ -1117,8 +1204,14 @@ function RemoteTile({ userId, stream, name, role, isMuted, isCameraOff, isHandRa
   return (
     <div className={cn('jitsi-video-tile h-full w-full flex items-center justify-center group relative', isHandRaised && 'jitsi-hand-raised', isActiveSpeaker && 'speaker-active')}>
       <SpeakerRing isActive={isActiveSpeaker} level={audioLevel} thumbnail={thumbnail} />
-      <video ref={videoRef} autoPlay playsInline className={cn('w-full h-full object-cover', showCameraOff && 'hidden')} />
-      {showCameraOff && (
+      <video ref={videoRef} autoPlay playsInline className={cn('w-full h-full object-cover', showCameraOff && 'hidden', isUnstable && 'blur-md grayscale opacity-50')} />
+      {isUnstable && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 z-20 backdrop-blur-sm">
+          <WifiOff className="h-8 w-8 text-amber-500 mb-2 animate-pulse" />
+          <span className="text-amber-400 font-medium text-xs text-center px-2 leading-tight">Unstable<br />Connection</span>
+        </div>
+      )}
+      {showCameraOff && !isUnstable && (
         <div className="absolute inset-0 flex items-center justify-center bg-black">
           <div className="w-24 h-24 rounded-full bg-[#333] flex items-center justify-center border border-white/5">
             <span className="text-3xl font-medium text-white/80">{initials}</span>
