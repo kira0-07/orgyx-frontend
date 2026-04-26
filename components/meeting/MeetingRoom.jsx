@@ -169,8 +169,8 @@ function ControlsBar({ isAudioEnabled, isVideoEnabled, isScreenSharing, isMobile
             </CtrlBtn>
             {showReactions && (
               <div className="absolute bottom-[120%] left-1/2 -translate-x-1/2 flex gap-2 bg-[var(--jitsi-thumbnail-bg)] border border-white/10 p-2 rounded-lg shadow-xl mb-1">
-                {['👍', '❤️', '😂', '🎉', '👏'].map(emoji => (
-                  <button key={emoji} onClick={() => { triggerReaction(emoji); setShowReactions(false); }} className="text-2xl hover:scale-125 transition-transform">{emoji}</button>
+                {['👍', '❤️', '😂', '🎉', '👏', '🔥', '🤔', '😲'].map(emoji => (
+                  <button key={emoji} onClick={() => { triggerReaction(emoji); setShowReactions(false); }} className="text-2xl hover:scale-125 hover:rotate-12 transition-transform duration-200">{emoji}</button>
                 ))}
               </div>
             )}
@@ -1037,20 +1037,20 @@ const remoteProps = (uid) => ({ isMuted: participantMediaState[uid]?.audio === f
             "bg-white flex flex-col z-50 transition-all duration-300 rounded-xl overflow-hidden shadow-xl border border-black/10 text-black mx-4 my-2",
             isMobile ? "fixed inset-x-0 bottom-[100px] h-[60vh]" : "w-[360px] relative shrink-0"
           )}>
-            <div className="px-5 py-4 flex items-center justify-between shrink-0 bg-white">
-              <span className="font-semibold text-gray-500 text-xs tracking-wider uppercase">In Call</span>
-              <button onClick={() => setAttendeesOpen(false)} className="text-gray-500 hover:text-black transition-all p-1.5 rounded hover:bg-black/5">
+            <div className="px-5 py-4 flex items-center justify-between shrink-0 bg-white/5 border-b border-white/5">
+              <span className="font-semibold text-white/40 text-[10px] tracking-widest uppercase">In Meeting • {totalParticipants}</span>
+              <button onClick={() => setAttendeesOpen(false)} className="text-white/40 hover:text-white transition-all p-1.5 rounded-full hover:bg-white/10">
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <div className="flex-1 min-h-0 overflow-y-auto p-2 custom-scrollbar bg-white space-y-1">
+            <div className="flex-1 min-h-0 overflow-y-auto p-2 custom-scrollbar space-y-1">
               {/* Local User */}
               <div className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg transition-colors group">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-teal-600 flex items-center justify-center text-white font-medium shadow-sm shrink-0">
+                  <div className="w-10 h-10 rounded-full bg-teal-600/20 border border-teal-500/30 flex items-center justify-center text-teal-400 font-bold shadow-sm shrink-0">
                     {myName.charAt(0).toUpperCase()}
                   </div>
-                  <span className="text-sm font-medium text-gray-700">{myName} (You)</span>
+                  <span className="text-sm font-medium text-white/90">{myName} (You)</span>
                 </div>
                 <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
                   {ringLevels[myId] > 0.05 && (
@@ -1075,10 +1075,10 @@ const remoteProps = (uid) => ({ isMuted: participantMediaState[uid]?.audio === f
                 return (
                   <div key={uid} className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg transition-colors group">
                     <div className="flex items-center gap-3">
-                      <div className={cn("w-10 h-10 rounded-full flex items-center justify-center text-white font-medium shadow-sm shrink-0", colorClass)}>
+                      <div className={cn("w-10 h-10 rounded-full flex items-center justify-center text-white font-bold shadow-sm shrink-0", colorClass)}>
                         {name.charAt(0).toUpperCase()}
                       </div>
-                      <span className="text-sm font-medium text-gray-700">{name}</span>
+                      <span className="text-sm font-medium text-white/90">{name}</span>
                     </div>
                     <div className="flex items-center gap-3">
                       {isSpeaking && (
@@ -1102,17 +1102,17 @@ const remoteProps = (uid) => ({ isMuted: participantMediaState[uid]?.audio === f
         {/* Chat Panel */}
         {chatOpen && (
           <div className={cn(
-            "bg-white flex flex-col z-50 transition-all duration-300 rounded-xl overflow-hidden shadow-xl border border-black/10 text-black mx-4 my-2",
+            "bg-[#1A1A1A]/95 backdrop-blur-xl flex flex-col z-50 transition-all duration-300 rounded-2xl overflow-hidden shadow-2xl border border-white/10 text-white mx-4 my-2",
             isMobile ? "fixed inset-x-0 bottom-[100px] h-[60vh]" : "w-[360px] relative shrink-0"
           )}>
-            <div className="px-5 py-4 border-b border-black/5 flex items-center justify-between shrink-0 bg-gray-50/50">
-              <span className="font-medium text-black text-sm">In-call messages</span>
-              <button onClick={() => setChatOpen(false)} className="text-gray-500 hover:text-black transition-all p-1.5 rounded hover:bg-black/5">
+            <div className="px-5 py-4 border-b border-white/5 flex items-center justify-between shrink-0 bg-white/5">
+              <span className="font-semibold text-white/90 text-sm">In-call messages</span>
+              <button onClick={() => setChatOpen(false)} className="text-white/40 hover:text-white transition-all p-1.5 rounded-full hover:bg-white/10">
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4 custom-scrollbar bg-white">
-              <div className="text-xs text-center text-gray-500 bg-gray-100/50 py-2 rounded-lg mb-4">
+            <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+              <div className="text-[11px] text-center text-white/40 bg-white/5 border border-white/5 py-2.5 px-4 rounded-xl mb-4 leading-relaxed">
                 Messages can only be seen by people in the call and are deleted when the call ends.
               </div>
               {messages.length === 0 ? (
@@ -1127,11 +1127,11 @@ const remoteProps = (uid) => ({ isMuted: participantMediaState[uid]?.audio === f
                   <div key={msg.id} className="flex flex-col gap-1 group">
                     {showHeader && (
                       <div className="flex items-baseline gap-2 mb-0.5 mt-2">
-                        <span className="text-[13px] font-semibold text-black">{msg.isOwn ? 'You' : msg.userName}</span>
-                        <span className="text-[11px] text-gray-400">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        <span className="text-[13px] font-semibold text-blue-400">{msg.isOwn ? 'You' : msg.userName}</span>
+                        <span className="text-[10px] text-white/30 uppercase tracking-tighter">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                       </div>
                     )}
-                    <div className="text-[14px] text-black break-words leading-relaxed inline-block max-w-[100%]">
+                    <div className="text-[14px] text-white/90 break-words leading-relaxed inline-block max-w-[100%]">
                       {msg.message}
                     </div>
                   </div>
@@ -1139,10 +1139,10 @@ const remoteProps = (uid) => ({ isMuted: participantMediaState[uid]?.audio === f
               })}
               <div ref={chatBottomRef} />
             </div>
-            <form onSubmit={e => { e.preventDefault(); const message = chatInput.trim(); if (!message || !socketRef.current) return; setMessages(prev => [...prev, { id: Date.now(), userId: myId, userName: myName, message, timestamp: new Date().toISOString(), isOwn: true }]); socketRef.current.emit('chat-message', { meetingId, message }); setChatInput(''); }} className="p-4 shrink-0 bg-white">
-              <div className="relative flex items-center bg-gray-100 border border-transparent rounded-full overflow-hidden focus-within:border-blue-500/30 focus-within:bg-white focus-within:shadow-sm transition-all px-2">
-                <input type="text" value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder="Send a message to everyone" className="flex-1 bg-transparent px-3 py-2.5 text-sm text-black placeholder:text-gray-500 focus:outline-none" />
-                <button type="submit" disabled={!chatInput.trim()} className="p-2 text-blue-500 hover:text-blue-700 disabled:opacity-30 disabled:hover:text-blue-500 transition-colors">
+            <form onSubmit={e => { e.preventDefault(); const message = chatInput.trim(); if (!message || !socketRef.current) return; setMessages(prev => [...prev, { id: Date.now(), userId: myId, userName: myName, message, timestamp: new Date().toISOString(), isOwn: true }]); socketRef.current.emit('chat-message', { meetingId, message }); setChatInput(''); }} className="p-4 shrink-0 bg-white/5 border-t border-white/5">
+              <div className="relative flex items-center bg-white/5 border border-white/10 rounded-xl overflow-hidden focus-within:border-blue-500/50 focus-within:bg-white/10 transition-all px-2">
+                <input type="text" value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder="Send a message to everyone" className="flex-1 bg-transparent px-3 py-3 text-sm text-white placeholder:text-white/30 focus:outline-none" />
+                <button type="submit" disabled={!chatInput.trim()} className="p-2 text-blue-400 hover:text-blue-300 disabled:opacity-20 transition-colors">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
                 </button>
               </div>

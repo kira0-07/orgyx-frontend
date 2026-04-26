@@ -64,8 +64,23 @@ export function useMeetingDetail(meetingId) {
 
     const onProcessingUpdate = (data) => {
       if (!mountedRef.current) return;
-      setProcessingStatus(prev => ({ ...prev, ...data }));
-      if (data.status === 'ready') {
+      
+      setProcessingStatus(prev => {
+        if (!prev) return { status: 'processing', processingSteps: [{ step: data.step, status: data.status, message: data.message }] };
+        
+        const newSteps = [...(prev.processingSteps || [])];
+        const stepIdx = newSteps.findIndex(s => s.step === data.step);
+        
+        if (stepIdx >= 0) {
+          newSteps[stepIdx] = { ...newSteps[stepIdx], status: data.status, message: data.message };
+        } else {
+          newSteps.push({ step: data.step, status: data.status, message: data.message });
+        }
+        
+        return { ...prev, processingSteps: newSteps, status: data.status === 'ready' ? 'ready' : prev.status };
+      });
+
+      if (data.status === 'ready' || data.step === 'ready') {
         fetchMeeting();
       }
     };
