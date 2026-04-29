@@ -38,7 +38,6 @@ export default function NewMeetingPage() {
     estimatedDuration: '60',
     domain: '',
     agenda: '',
-    externalLink: '',
     attendees: []
   });
 
@@ -244,22 +243,6 @@ export default function NewMeetingPage() {
                     className="bg-muted border-border text-foreground placeholder:text-muted-foreground resize-none"
                     rows={3}
                     placeholder="• Topic 1&#10;• Topic 2&#10;• Topic 3"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="externalLink" className="text-foreground flex items-center gap-1.5">
-                    <Link2 className="h-3.5 w-3.5 text-muted-foreground" />
-                    External Link
-                    <span className="text-xs text-muted-foreground font-normal">(Optional)</span>
-                  </Label>
-                  <Input
-                    id="externalLink"
-                    type="url"
-                    placeholder="https://zoom.us/j/..."
-                    value={formData.externalLink}
-                    onChange={(e) => setFormData({ ...formData, externalLink: e.target.value })}
-                    className="bg-muted border-border text-foreground placeholder:text-muted-foreground"
                   />
                 </div>
               </CardContent>

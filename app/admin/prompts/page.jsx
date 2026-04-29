@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import {
-  Settings, Save, Loader2, RefreshCw, Search, ChevronDown, ChevronUp
+  Settings, Save, Loader2, RefreshCw, Search, ChevronDown, ChevronUp, Plus
 } from 'lucide-react';
 import api from '@/lib/axios';
 import { useAuth } from '@/context/AuthContext';
@@ -26,6 +26,15 @@ export default function AdminPromptsPage() {
   const [editingTemplate, setEditingTemplate] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
   const [search, setSearch] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
+  const [newTemplate, setNewTemplate] = useState({
+    name: '',
+    domain: '',
+    description: '',
+    systemPrompt: '',
+    userPromptTemplate: '',
+    isActive: true
+  });
 
   useEffect(() => {
     if (!authLoading && !isAdmin) {
@@ -61,6 +70,33 @@ export default function AdminPromptsPage() {
     } catch (error) {
       console.error('Failed to save template:', error);
       toast.error('Failed to save template');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const createTemplate = async () => {
+    if (!newTemplate.name || !newTemplate.domain) {
+      toast.error('Name and Domain are required');
+      return;
+    }
+    setIsSaving(true);
+    try {
+      await api.post('/admin/prompts', newTemplate);
+      toast.success('Template created successfully');
+      setIsCreating(false);
+      setNewTemplate({
+        name: '',
+        domain: '',
+        description: '',
+        systemPrompt: '',
+        userPromptTemplate: '',
+        isActive: true
+      });
+      fetchTemplates();
+    } catch (error) {
+      console.error('Failed to create template:', error);
+      toast.error('Failed to create template');
     } finally {
       setIsSaving(false);
     }
@@ -104,11 +140,98 @@ export default function AdminPromptsPage() {
             <h1 className="text-3xl font-bold">Prompt Templates</h1>
             <p className="text-muted-foreground">Manage AI prompt templates for meeting analysis</p>
           </div>
-          <Button variant="outline" onClick={fetchTemplates} className="border-slate-700">
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Refresh
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={fetchTemplates} className="border-slate-700">
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Refresh
+            </Button>
+            <Button onClick={() => setIsCreating(true)} className="bg-primary hover:bg-primary/90">
+              <Plus className="mr-2 h-4 w-4" />
+              Add Prompt
+            </Button>
+          </div>
         </div>
+
+        {/* Create New Template Form */}
+        {isCreating && (
+          <Card className="bg-card border-primary/50 border-2">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Plus className="h-5 w-5 text-primary" />
+                Create New Prompt Template
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Template Name <span className="text-destructive">*</span></Label>
+                  <Input
+                    placeholder="e.g. Sprint Planning Analysis"
+                    value={newTemplate.name}
+                    onChange={(e) => setNewTemplate(prev => ({ ...prev, name: e.target.value }))}
+                    className="bg-muted border-slate-700"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Domain / Slug <span className="text-destructive">*</span></Label>
+                  <Input
+                    placeholder="e.g. Sprint-Planning"
+                    value={newTemplate.domain}
+                    onChange={(e) => setNewTemplate(prev => ({ ...prev, domain: e.target.value }))}
+                    className="bg-muted border-slate-700"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Description</Label>
+                <Input
+                  placeholder="Short description of what this template is for..."
+                  value={newTemplate.description}
+                  onChange={(e) => setNewTemplate(prev => ({ ...prev, description: e.target.value }))}
+                  className="bg-muted border-slate-700"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-muted-foreground">System Prompt</Label>
+                <Textarea
+                  value={newTemplate.systemPrompt}
+                  onChange={(e) => setNewTemplate(prev => ({ ...prev, systemPrompt: e.target.value }))}
+                  className="bg-muted border-slate-700 min-h-[180px] font-mono text-sm"
+                  placeholder="The system instructions for the AI..."
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-muted-foreground">User Prompt Template</Label>
+                <Textarea
+                  value={newTemplate.userPromptTemplate}
+                  onChange={(e) => setNewTemplate(prev => ({ ...prev, userPromptTemplate: e.target.value }))}
+                  className="bg-muted border-slate-700 min-h-[140px] font-mono text-sm"
+                  placeholder="Template with variables like {transcript}..."
+                />
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setIsCreating(false)}
+                  className="border-slate-700"
+                >
+                  Cancel
+                </Button>
+                <Button onClick={createTemplate} disabled={isSaving}>
+                  {isSaving ? (
+                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Creating...</>
+                  ) : (
+                    <><Save className="mr-2 h-4 w-4" />Create Template</>
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Search */}
         <Card className="bg-card border-muted">
