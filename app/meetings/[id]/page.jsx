@@ -1148,7 +1148,16 @@ export default function MeetingDetailPage({ params }) {
               <Button variant="outline" className="border-border text-foreground hover:bg-muted" onClick={() => setActiveTab('summary')}><FileText className="mr-2 h-4 w-4" />View Summary</Button>
             )}
 
-            {meeting.status === 'completed' && !isProcessing && (
+            {/* Analysis Action */}
+            {(isProcessing || isAnalyzing) ? (
+              <Button
+                disabled
+                className="w-full sm:w-auto bg-purple-600/50 cursor-not-allowed text-white shadow-lg shadow-purple-500/20 transition-all flex items-center gap-2"
+              >
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Meeting is under analysis
+              </Button>
+            ) : meeting.status === 'completed' ? (
               meeting.recordingUrl ? (
                 <Button
                   disabled={isAnalyzing}
@@ -1168,7 +1177,7 @@ export default function MeetingDetailPage({ params }) {
                   }}
                   className="w-full sm:w-auto bg-purple-600 hover:bg-purple-700 disabled:opacity-60 disabled:cursor-not-allowed text-white shadow-lg shadow-purple-500/20 analyze-ready transition-all"
                 >
-                  {isAnalyzing ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Starting...</> : <>✨ Analyze Meeting</>}
+                  ✨ Analyze Meeting
                 </Button>
               ) : (
                 <div className="relative group">
@@ -1181,7 +1190,7 @@ export default function MeetingDetailPage({ params }) {
                   </div>
                 </div>
               )
-            )}
+            ) : null}
 
             {isReady && (<Button onClick={() => router.push(`/meetings/${meeting._id}/schedule-followup`)} className="bg-blue-600 hover:bg-blue-700"><Plus className="mr-2 h-4 w-4" />Schedule Follow-up</Button>)}
           </div>

@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Search, Calendar, Clock, Users, Video, Link2, LayoutGrid, X, CheckCircle2 } from 'lucide-react';
+import { Loader2, Search, Calendar, Clock, Users, ChartBar, Link2, LayoutGrid, X, CheckCircle2 } from 'lucide-react';
 import api from '@/lib/axios';
 import { useAuth } from '@/context/AuthContext';
 import toast from 'react-hot-toast';
@@ -54,7 +54,7 @@ export default function NewMeetingPage() {
         setIsFetchingUsers(false);
       }
     };
-    
+
     fetchOrgTreeUsers();
   }, []);
 
@@ -101,7 +101,7 @@ export default function NewMeetingPage() {
 
   const myId = (user?._id || user?.id)?.toString();
   const availableUsers = myId ? users.filter(u => u._id?.toString() !== myId) : users;
-  
+
   const filteredUsers = availableUsers.filter(u =>
     `${u.firstName} ${u.lastName} ${u.role}`.toLowerCase()
       .includes(searchUsers.toLowerCase())
@@ -207,16 +207,14 @@ export default function NewMeetingPage() {
                       key={domain.value}
                       type="button"
                       onClick={() => setFormData({ ...formData, domain: domain.value })}
-                      className={`flex items-center gap-2.5 p-3 rounded-lg border-2 transition-all duration-200 text-left ${
-                        formData.domain === domain.value
+                      className={`flex items-center gap-2.5 p-3 rounded-lg border-2 transition-all duration-200 text-left ${formData.domain === domain.value
                           ? 'border-primary bg-primary/10 shadow-sm'
                           : 'border-border bg-muted/50 hover:border-muted-foreground/30 hover:bg-muted'
-                      }`}
+                        }`}
                     >
                       <span className="text-lg">{domain.icon}</span>
-                      <span className={`text-sm font-medium ${
-                        formData.domain === domain.value ? 'text-primary' : 'text-foreground'
-                      }`}>
+                      <span className={`text-sm font-medium ${formData.domain === domain.value ? 'text-primary' : 'text-foreground'
+                        }`}>
                         {domain.value}
                       </span>
                     </button>
@@ -229,8 +227,8 @@ export default function NewMeetingPage() {
             <Card className="bg-card border-border shadow-sm">
               <CardHeader className="pb-4">
                 <CardTitle className="flex items-center gap-2 text-base">
-                  <Video className="h-4 w-4 text-primary" />
-                  Agenda & Links
+                  <ChartBar className="h-4 w-4 text-primary" />
+                  Agenda
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-5">
@@ -320,11 +318,10 @@ export default function NewMeetingPage() {
                     return (
                       <label
                         key={u._id}
-                        className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all duration-150 ${
-                          isSelected
+                        className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all duration-150 ${isSelected
                             ? 'bg-primary/10 border border-primary/20 shadow-sm'
                             : 'hover:bg-muted border border-transparent'
-                        }`}
+                          }`}
                       >
                         <input
                           type="checkbox"
@@ -332,9 +329,8 @@ export default function NewMeetingPage() {
                           onChange={() => handleAttendeeChange(u._id)}
                           className="sr-only"
                         />
-                        <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors shrink-0 ${
-                          isSelected ? 'bg-primary border-primary' : 'border-muted-foreground/40'
-                        }`}>
+                        <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors shrink-0 ${isSelected ? 'bg-primary border-primary' : 'border-muted-foreground/40'
+                          }`}>
                           {isSelected && <CheckCircle2 className="h-3.5 w-3.5 text-primary-foreground" />}
                         </div>
                         <div className="flex items-center gap-3 flex-1 min-w-0">

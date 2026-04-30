@@ -15,11 +15,13 @@ export default function MeetingQAPanel({ meetingId, meetingName }) {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
-  const messagesEndRef = useRef(null);
+  const scrollContainerRef = useRef(null);
 
-  // Only scrolls the messages area, never the page
+  // Scrolls only the internal container to the bottom
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
+    }
   }, [messages]);
 
   const handleSubmit = async (e) => {
@@ -69,7 +71,10 @@ export default function MeetingQAPanel({ meetingId, meetingName }) {
       </div>
 
       {/* ── Messages — only this div scrolls ── */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3">
+      <div 
+        ref={scrollContainerRef}
+        className="flex-1 min-h-0 overflow-y-auto px-4 py-3"
+      >
         {messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center gap-2">
             <MessageSquare className="h-10 w-10 text-muted-foreground" />
@@ -132,8 +137,6 @@ export default function MeetingQAPanel({ meetingId, meetingName }) {
                 </div>
               </div>
             )}
-            {/* Auto-scroll anchor */}
-            <div ref={messagesEndRef} />
           </div>
         )}
       </div>
